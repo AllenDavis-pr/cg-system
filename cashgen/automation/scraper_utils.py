@@ -99,6 +99,7 @@ async def generic_scraper(
     await setup_page_optimization(page)
 
     try:
+        print("Attempting to go to ", url)
         await page.goto(url, wait_until='domcontentloaded')
         await page.wait_for_selector(price_class, timeout=15000)
     except Exception as e:
@@ -252,7 +253,7 @@ async def ebay_scraper(
     except Exception as e:
         print(f"Warning: eBay content loading issue: {e}")
 
-    print(url)
+    print("Reached ", url)
 
     # --- Grab card containers once ---
     card_containers = await page.query_selector_all('.s-item__wrapper, .su-card-container, .s-item')

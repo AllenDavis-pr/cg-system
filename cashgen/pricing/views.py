@@ -106,87 +106,151 @@ def split_reasoning_and_price(ai_response: str):
 
 def individual_item_analyser_view(request):
     # Handle prefilled data from URL parameters
-    prefilled_item = request.GET.get('item', '')
-    prefilled_market_item = request.GET.get('market_item', '')
-    prefilled_description = request.GET.get('description', '')
-    prefilled_serial = request.GET.get('serial', '')
-
+    prefilled_data = get_prefilled_data(request)
+    
     if request.method == "POST" and request.headers.get("Content-Type") == "application/json":
-        try:
-            data = json.loads(request.body)
-            item_name = (data.get("item_name") or "").strip()
-            description = (data.get("description") or "").strip()
+        return handle_item_analysis_request(request)
+    
+    # GET (render page)
+    return render(request, "individual_item_analyser.html", {"prefilled_data": prefilled_data})
 
-            # get all competitor listings for this title (fuzzy)
-            competitor_data_for_ai = get_competitor_data(item_name, include_url=False)      # ❗ no URL to AI
-            competitor_data_for_frontend = get_competitor_data(item_name, include_url=True) # ✅ URL to frontend
 
-            # If none exist → run scraper first
-            if not competitor_data_for_ai.strip():
-                print(f"No competitor listings found for '{item_name}'. Triggering scrape...")
-                scrape_all_competitors(item_name)
-
-                # Re-fetch after scraping
-                competitor_data_for_ai = get_competitor_data(item_name, include_url=False)
-                competitor_data_for_frontend = get_competitor_data(item_name, include_url=True)
-
-            prompt = build_price_analysis_prompt(
-                item_name=item_name,
-                description=description,
-                competitor_data=competitor_data_for_ai,
-            )
-
-            ai_response = call_gemini_sync(prompt)
-            reasoning, suggested_price = split_reasoning_and_price(ai_response)
-
-            # Get or create inventory item
-            inventory_item, _ = InventoryItem.objects.get_or_create(
-                title=item_name,
-                defaults={"description": description}
-            )
-
-            competitor_count = len(competitor_data_for_frontend.strip().split("\n")) if (
-                competitor_data_for_frontend.strip()) else 0
-
-            # Remove pound symbol
-            match = re.search(r"(.*)FINAL:\s*£\s*(\d+(?:\.\d+)?)", ai_response, re.DOTALL)
-            if match:
-                reasoning = match.group(1).strip()
-                price_str = match.group(2)
-                decimal_price = float(price_str)  # Convert to decimal number
-
-            analysis, created = PriceAnalysis.objects.update_or_create(
-                item=inventory_item,
-                defaults={
-                    "reasoning": reasoning,
-                    "suggested_price": decimal_price,
-                    "confidence": min(100,
-                    competitor_count * 15),  # example logic
-                    "created_at": datetime.now() } )
-
-            return JsonResponse({
-                "success": True,
-                "suggested_price": suggested_price,
-                "reasoning": reasoning,
-                "full_response": ai_response,
-                "submitted_data": {"item_name": item_name, "description": description},
-                # ✅ URLs only here:
-                "competitor_data": competitor_data_for_frontend,
-                "competitor_count": competitor_count
-            })
-        except Exception as e:
-            return JsonResponse({"success": False, "error": str(e)}, status=500)
-
-    # Pass prefilled data to template
-    context = {
-        'prefilled_item': prefilled_item,
-        'prefilled_market_item': prefilled_market_item,
-        'prefilled_description': prefilled_description,
-        'prefilled_serial': prefilled_serial,
+def get_prefilled_data(request):
+    """Extract prefilled data from request parameters"""
+    return {
+        'item': request.GET.get('item', ''),
+        'market_item': request.GET.get('market_item', ''),
+        'description': request.GET.get('description', ''),
+        'serial': request.GET.get('serial', ''),
     }
 
-    # GET (render page)
-    return render(request, "individual_item_analyser.html", context)
+
+def handle_item_analysis_request(request):
+    """Handle JSON POST request for item analysis"""
+    try:
+        data = json.loads(request.body)
+        return process_item_analysis(data)
+    except Exception as e:
+        return JsonResponse({"success": False, "error": str(e)}, status=500)
+
+
+def process_item_analysis(data):
+    """Main processing logic for item analysis that can be reused across screens"""
+    # Extract and clean data
+    item_name = (data.get("item_name") or "").strip()
+    description = (data.get("description") or "").strip()
+    
+    # Get competitor data with scraping if needed
+    competitor_data_for_ai, competitor_data_for_frontend = get_or_scrape_competitor_data(item_name)
+    
+    # Generate AI analysis
+    ai_response, reasoning, suggested_price = generate_price_analysis(
+        item_name, description, competitor_data_for_ai
+    )
+    
+    # Save analysis to database
+    analysis_result = save_analysis_to_db(
+        item_name, description, reasoning, suggested_price, competitor_data_for_frontend
+    )
+    
+    # Prepare response
+    return JsonResponse({
+        "success": True,
+        "suggested_price": suggested_price,
+        "reasoning": reasoning,
+        "full_response": ai_response,
+        "submitted_data": {"item_name": item_name, "description": description},
+        "competitor_data": competitor_data_for_frontend,
+        "competitor_count": analysis_result["competitor_count"],
+        "analysis_id": analysis_result["analysis_id"]  # Useful for other screens
+    })
+
+
+def get_or_scrape_competitor_data(item_name):
+    """Get competitor data, scraping if necessary"""
+    competitor_data_for_ai = get_competitor_data(item_name, include_url=False)
+    competitor_data_for_frontend = get_competitor_data(item_name, include_url=True)
+    
+    # If no competitor data exists, trigger scraping
+    if not competitor_data_for_ai.strip():
+        print(f"No competitor listings found for '{item_name}'. Triggering scrape...")
+        scrape_all_competitors(item_name)
+        
+        # Re-fetch after scraping
+        competitor_data_for_ai = get_competitor_data(item_name, include_url=False)
+        competitor_data_for_frontend = get_competitor_data(item_name, include_url=True)
+    
+    return competitor_data_for_ai, competitor_data_for_frontend
+
+
+def generate_price_analysis(item_name, description, competitor_data):
+    """Generate AI analysis for pricing"""
+    prompt = build_price_analysis_prompt(
+        item_name=item_name,
+        description=description,
+        competitor_data=competitor_data,
+    )
+    
+    ai_response = call_gemini_sync(prompt)
+    reasoning, suggested_price = split_reasoning_and_price(ai_response)
+    
+    return ai_response, reasoning, suggested_price
+
+
+def save_analysis_to_db(item_name, description, reasoning, suggested_price, competitor_data):
+    """Save analysis results to database"""
+    # Parse price from AI response
+    decimal_price = parse_price_from_response(suggested_price)
+    
+    # Get or create inventory item
+    inventory_item, _ = InventoryItem.objects.get_or_create(
+        title=item_name,
+        defaults={"description": description}
+    )
+    
+    # Calculate competitor count
+    competitor_count = calculate_competitor_count(competitor_data)
+    
+    # Save analysis
+    analysis, created = PriceAnalysis.objects.update_or_create(
+        item=inventory_item,
+        defaults={
+            "reasoning": reasoning,
+            "suggested_price": decimal_price,
+            "confidence": calculate_confidence(competitor_count),
+            "created_at": datetime.now()
+        }
+    )
+    
+    return {
+        "competitor_count": competitor_count,
+        "analysis_id": analysis.id
+    }
+
+
+def parse_price_from_response(price_response):
+    """Extract decimal price from AI response"""
+    match = re.search(r"(.*)FINAL:\s*£\s*(\d+(?:\.\d+)?)", price_response, re.DOTALL)
+    if match:
+        price_str = match.group(2)
+        return float(price_str)
+    # Fallback: try to extract any number if the pattern doesn't match
+    match_fallback = re.search(r"£?\s*(\d+(?:\.\d+)?)", price_response)
+    if match_fallback:
+        return float(match_fallback.group(1))
+    return 0.0  # Default fallback
+
+
+def calculate_competitor_count(competitor_data):
+    """Calculate number of competitors from competitor data"""
+    if not competitor_data.strip():
+        return 0
+    return len(competitor_data.strip().split("\n"))
+
+
+def calculate_confidence(competitor_count):
+    """Calculate confidence score based on competitor count"""
+    return min(100, competitor_count * 15)
 
 
 def inventory_free_stock_view(request):
