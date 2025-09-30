@@ -115,6 +115,17 @@ def individual_item_analyser_view(request):
     return render(request, "individual_item_analyser.html", {"prefilled_data": prefilled_data})
 
 
+def item_buying_analyser_view(request):
+    # Handle prefilled data from URL parameters
+    prefilled_data = get_prefilled_data(request)
+    
+    if request.method == "POST" and request.headers.get("Content-Type") == "application/json":
+        return handle_item_analysis_request(request)
+    
+    # GET (render page)
+    return render(request, "individual_item_analyser.html", {"prefilled_data": prefilled_data})
+
+
 def get_prefilled_data(request):
     """Extract prefilled data from request parameters"""
     return {
