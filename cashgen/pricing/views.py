@@ -123,7 +123,7 @@ def item_buying_analyser_view(request):
         return handle_item_analysis_request(request)
     
     # GET (render page)
-    return render(request, "individual_item_analyser.html", {"prefilled_data": prefilled_data})
+    return render(request, "item_buying_analyser.html", {"prefilled_data": prefilled_data})
 
 
 def get_prefilled_data(request):
