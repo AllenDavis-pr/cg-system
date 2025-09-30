@@ -1,0 +1,599 @@
+from django.shortcuts import render
+from django.http import JsonResponse
+from django.db.models import Q, Prefetch
+from django.views.decorators.csrf import csrf_exempt
+from django.views.decorators.http import require_POST, require_GET
+from pricing.models import InventoryItem, MarketItem, CompetitorListing, PriceAnalysis
+from datetime import datetime
+from django.shortcuts import get_object_or_404
+
+import google.generativeai as genai
+from google.generativeai import GenerationConfig
+import os, requests, json, re, subprocess
+
+GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
+GEMINI_MODEL = "gemini-2.5-flash-lite"
+
+def call_gemini_sync(prompt: str) -> str:
+    """
+    Call Google Gemini 2.5 Flash Lite (synchronous) with a simple prompt string.
+    Returns plain text response, or error message if failed.
+    """
+    try:
+        model = genai.GenerativeModel(GEMINI_MODEL)
+
+        # I want to reduce the temperature so the recommended prices are less random
+        generation_config = GenerationConfig(
+            temperature=0.0,  # Lower temperature -> more deterministic
+            max_output_tokens=1024  # Adjust as needed
+        )
+
+        response = model.generate_content(prompt, generation_config=generation_config)
+        return response.text.strip() if response and response.text else "No response"
+    except Exception as e:
+        print("Gemini API error:", e)
+        return "Sorry, I couldn't get a response from Gemini."
+
+def build_price_analysis_prompt(
+    item_name: str,
+    description: str,
+    competitor_data: str,
+    cost_price: str = "",
+    market_item_title: str = ""
+) -> str:
+    """
+    Constructs the prompt for Gemini AI to suggest an ideal selling price.
+    """
+
+    prompt = (
+        f"Item Title: {item_name}\n"
+        f"Market Item: {market_item_title}\n"
+        f"Description: {description}\n\n"
+        f"Competitor Listings:\n{competitor_data}\n\n"
+        f"Please mention this cost price in your answer: {cost_price}\n\n"
+        "Based on the competitor prices and item details, suggest an ideal selling price. "
+        "Be concise, professional and matter-of-fact. "
+        "Do not split your reasoning into sections. Have it as one paragraph."
+        "ALWAYS quote competitor data (with the competitor name, store location) to justify reasoning. "
+        "Prioritise CashGenerator listings over other listings. "
+        "Consider the desirability of the item (how much people want it) and the "
+        "sellability of the item (how easy it is to sell to a general population). "
+        "For example, the newest Mac laptop is very desirable, but due to its price, not very "
+        "sellable, although there will be a niche that will buy it. "
+        "Do not hallucinate product descriptions that aren't there. As of now, you only have the item name"
+        "Mention details that make it hard for you to suggest a price. For example, not knowing the storage capacity of whatever item you're trying to suggest " \
+        "a price for, or not knowing what version of the item it is."
+        "ALWAYS end the message with FINAL:£SUGGESTED_PRICE where SUGGESTED_PRICE is the final price."
+    )
+    return prompt
+
+
+def get_competitor_data(item_title: str, include_url: bool = True) -> str:
+    """
+    Return a newline-separated string of competitor lines:
+    "Competitor | Listing Title | £price | Store Name"
+    If include_url=True, append the URL at the end.
+    """
+    if not item_title:
+        return ""
+
+    listings = CompetitorListing.objects.filter(market_item__title__icontains=item_title)
+    lines = []
+    for l in listings:
+        price_str = f"£{l.price:.2f}" if l.price is not None else "N/A"
+        store_str = l.store_name if l.store_name else "N/A"
+        if include_url:
+            url_str = l.url if l.url else "#"
+            lines.append(f"{l.competitor} | {l.title} | {price_str} | {store_str} | {url_str}")
+        else:
+            lines.append(f"{l.competitor} | {l.title} | {price_str} | {store_str}")
+    return "\n".join(lines)
+
+
+def split_reasoning_and_price(ai_response: str):
+    """
+    Splits AI response into reasoning and FINAL:£<price>.
+    If not found, returns (ai_response, "N/A")
+    """
+    decimal_price=None
+    match = re.search(r"(.*)FINAL:\s*£\s*(\d+(?:\.\d+)?)", ai_response, re.DOTALL)
+    if match:
+        reasoning = match.group(1).strip()
+        price = f"£{match.group(2)}"
+        return reasoning, price
+    return ai_response.strip(), "N/A"
+
+
+def individual_item_analyser_view(request):
+    # Handle prefilled data from URL parameters
+    prefilled_item = request.GET.get('item', '')
+    prefilled_market_item = request.GET.get('market_item', '')
+    prefilled_description = request.GET.get('description', '')
+    prefilled_serial = request.GET.get('serial', '')
+
+    if request.method == "POST" and request.headers.get("Content-Type") == "application/json":
+        try:
+            data = json.loads(request.body)
+            item_name = (data.get("item_name") or "").strip()
+            description = (data.get("description") or "").strip()
+
+            # get all competitor listings for this title (fuzzy)
+            competitor_data_for_ai = get_competitor_data(item_name, include_url=False)      # ❗ no URL to AI
+            competitor_data_for_frontend = get_competitor_data(item_name, include_url=True) # ✅ URL to frontend
+
+            # If none exist → run scraper first
+            if not competitor_data_for_ai.strip():
+                print(f"No competitor listings found for '{item_name}'. Triggering scrape...")
+                scrape_all_competitors(item_name)
+
+                # Re-fetch after scraping
+                competitor_data_for_ai = get_competitor_data(item_name, include_url=False)
+                competitor_data_for_frontend = get_competitor_data(item_name, include_url=True)
+
+            prompt = build_price_analysis_prompt(
+                item_name=item_name,
+                description=description,
+                competitor_data=competitor_data_for_ai,
+            )
+
+            ai_response = call_gemini_sync(prompt)
+            reasoning, suggested_price = split_reasoning_and_price(ai_response)
+
+            # Get or create inventory item
+            inventory_item, _ = InventoryItem.objects.get_or_create(
+                title=item_name,
+                defaults={"description": description}
+            )
+
+            competitor_count = len(competitor_data_for_frontend.strip().split("\n")) if (
+                competitor_data_for_frontend.strip()) else 0
+
+            # Remove pound symbol
+            match = re.search(r"(.*)FINAL:\s*£\s*(\d+(?:\.\d+)?)", ai_response, re.DOTALL)
+            if match:
+                reasoning = match.group(1).strip()
+                price_str = match.group(2)
+                decimal_price = float(price_str)  # Convert to decimal number
+
+            analysis, created = PriceAnalysis.objects.update_or_create(
+                item=inventory_item,
+                defaults={
+                    "reasoning": reasoning,
+                    "suggested_price": decimal_price,
+                    "confidence": min(100,
+                    competitor_count * 15),  # example logic
+                    "created_at": datetime.now() } )
+
+            return JsonResponse({
+                "success": True,
+                "suggested_price": suggested_price,
+                "reasoning": reasoning,
+                "full_response": ai_response,
+                "submitted_data": {"item_name": item_name, "description": description},
+                # ✅ URLs only here:
+                "competitor_data": competitor_data_for_frontend,
+                "competitor_count": competitor_count
+            })
+        except Exception as e:
+            return JsonResponse({"success": False, "error": str(e)}, status=500)
+
+    # Pass prefilled data to template
+    context = {
+        'prefilled_item': prefilled_item,
+        'prefilled_market_item': prefilled_market_item,
+        'prefilled_description': prefilled_description,
+        'prefilled_serial': prefilled_serial,
+    }
+
+    # GET (render page)
+    return render(request, "individual_item_analyser.html", context)
+
+
+def inventory_free_stock_view(request):
+    inventory_items = (
+        InventoryItem.objects
+        .filter(status="free_stock")
+        .select_related("agreement", "market_item")
+        .prefetch_related(
+            Prefetch("market_item__listings")
+        )
+    )
+    return render(request, "inventory_free_stock.html", {"inventory_items": inventory_items})
+
+
+@require_GET
+def marketitem_suggestions(request):
+    query = request.GET.get("q", "").strip()
+    suggestions = []
+
+    if query:
+        market_items = MarketItem.objects.filter(title__icontains=query)[:10]
+        suggestions = [item.title for item in market_items]
+
+    return JsonResponse({
+        "suggestions": suggestions,
+        "query": query,
+        "count": len(suggestions),
+    })
+
+
+@csrf_exempt
+@require_POST
+def link_inventory_to_marketitem(request):
+    try:
+        data = json.loads(request.body)
+        inventory_title = (data.get('inventory_title') or '').strip()
+        marketitem_title = (data.get('marketitem_title') or '').strip()
+        exclude_keywords = (data.get('exclude_keywords') or '').strip()  # optional
+
+        if not inventory_title:
+            return JsonResponse({'success': False, 'error': 'Missing inventory title'})
+        if not marketitem_title:
+            return JsonResponse({'success': False, 'error': 'Missing market item title'})
+
+        inventory_item, inventory_created = InventoryItem.objects.get_or_create(
+            title__iexact=inventory_title,
+            defaults={'title': inventory_title}  # optional fields
+        )
+
+        # Check if MarketItem exists
+        market_item, marketitem_created = MarketItem.objects.get_or_create(
+            title__iexact=marketitem_title,
+            defaults={'title': marketitem_title, 'exclude_keywords': exclude_keywords}
+        )
+
+        competitor_count = market_item.listings.count()
+
+
+        # Link the inventory item
+        inventory_item.market_item = market_item
+        inventory_item.save()
+
+        return JsonResponse({
+            'success': True,
+            'competitor_count': competitor_count,
+            'linked_inventory': inventory_item.title,
+            'linked_market_item': market_item.title,
+            'created_new_marketitem': marketitem_created  # True if a new MarketItem was created
+        })
+
+    except Exception as e:
+        import traceback; traceback.print_exc()
+        return JsonResponse({'success': False, 'error': str(e)}, status=500)
+
+@require_POST
+@csrf_exempt
+def unlink_inventory_from_marketitem(request):
+    try:
+        data = json.loads(request.body.decode('utf-8') if isinstance(request.body, bytes) else request.body)
+        inventory_title = (data.get('inventory_title') or '').strip()
+        marketitem_title = (data.get('marketitem_title') or '').strip()
+
+        if not inventory_title:
+            return JsonResponse({'success': False, 'error': 'Missing inventory_title'}, status=400)
+
+        try:
+            inventory_item = InventoryItem.objects.get(title__iexact=inventory_title)
+        except InventoryItem.DoesNotExist:
+            return JsonResponse({'success': False, 'error': 'Inventory item not found'}, status=404)
+
+        if not inventory_item.market_item:
+            return JsonResponse({'success': False, 'error': 'Inventory item is not linked'}, status=400)
+
+        if marketitem_title and inventory_item.market_item.title.lower() != marketitem_title.lower():
+            return JsonResponse({'success': False, 'error': 'Inventory item is linked to a different MarketItem'}, status=400)
+
+        inventory_item.market_item = None
+        inventory_item.save()
+
+        return JsonResponse({'success': True})
+    except json.JSONDecodeError:
+        return JsonResponse({'success': False, 'error': 'Invalid JSON'}, status=400)
+    except Exception as e:
+        import traceback; traceback.print_exc()
+        return JsonResponse({'success': False, 'error': str(e)}, status=500)
+
+
+@csrf_exempt
+@require_POST
+def launch_playwright_listing(request):
+    """
+    Endpoint to launch Playwright automation for item listing
+    """
+    try:
+        data = json.loads(request.body)
+        item_name = data.get('item_name', '').strip()
+        description = data.get('description', '').strip()
+        price = data.get('price', '').strip()
+        serial_number = data.get('serial_number', '').strip()
+
+        if not all([item_name, description, price]):
+            return JsonResponse({
+                'success': False,
+                'error': 'Missing required fields'
+            })
+
+        # Clean price (remove £ symbol)
+        clean_price = price.replace('£', '').strip()
+
+        import sys
+        # Determine the absolute path to the Playwright script
+        if getattr(sys, 'frozen', False):
+            # PyInstaller executable
+            base_path = sys._MEIPASS  # temp folder PyInstaller extracts to
+        else:
+            # Running in IDE / normal Python
+            base_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+
+        script_path = os.path.join(base_path, 'automation', 'playwright_listing.py')
+
+        # Run subprocess with sys.executable (the current Python interpreter)
+        result = subprocess.run([
+            sys.executable,
+            script_path,
+            '--item_name', item_name,
+            '--description', description,
+            '--price', clean_price,
+            '--serial_number', serial_number,
+        ], capture_output=True, text=True, timeout=300)  # 5 minute timeout
+
+
+        print("---- Playwright script output ----")
+        print(result.stdout)
+        print("---- Playwright script errors ----")
+        print(result.stderr)
+        print("---- End of playwright script output ----")
+
+        print(result.returncode)
+        if result.returncode == 0:
+            return JsonResponse({
+                'success': True,
+                'message': 'Listing automation completed successfully'
+            })
+        else:
+            return JsonResponse({
+                'success': False,
+                'error': f'Automation failed: {result.stderr}'
+            })
+
+    except subprocess.TimeoutExpired:
+        return JsonResponse({
+            'success': False,
+            'error': 'Automation timed out after 5 minutes'
+        })
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'error': str(e)
+        })
+
+
+from automation.scraper_utils import save_prices
+COMPETITORS = ["CashConverters", "CashGenerator", "CEX", "eBay"]
+
+def scrape_all_competitors(item_name: str):
+    """
+    Run the scraper for all configured competitors and save results to DB.
+    """
+    try:
+        print(f"Scraping all competitors for '{item_name}'...")
+        save_prices(COMPETITORS, item_name)  # pass list, not single
+    except Exception as e:
+        print(f"⚠️ Scraper failed for {item_name}: {e}")
+
+
+@csrf_exempt
+@require_POST
+def update_marketitem_keywords(request):
+    try:
+        data = json.loads(request.body)
+        marketitem_title = (data.get("marketitem_title") or "").strip()
+        exclude_keywords = (data.get("exclude_keywords") or "").strip()
+
+        if not marketitem_title:
+            return JsonResponse({"success": False, "error": "Missing MarketItem title"}, status=400)
+
+        market_item = MarketItem.objects.get(title__iexact=marketitem_title)
+        market_item.exclude_keywords = exclude_keywords
+        market_item.save()
+
+        return JsonResponse({"success": True, "message": "Keywords updated successfully"})
+    except MarketItem.DoesNotExist:
+        return JsonResponse({"success": False, "error": "MarketItem not found"}, status=404)
+    except Exception as e:
+        return JsonResponse({"success": False, "error": str(e)}, status=500)
+
+
+def bulk_analysis(request):
+    return render(request, 'bulk_analysis.html')
+
+
+@csrf_exempt
+@require_POST
+def bulk_analyse_items(request):
+    """
+    Analyse multiple items in bulk, using linked MarketItem for competitor searches
+    """
+    try:
+        data = json.loads(request.body)
+        items = data.get("items", [])  # List of {barcode, barserial, name, etc.}
+
+        if not items:
+            return JsonResponse({"success": False, "error": "No items provided"})
+
+        results = []
+
+        for item_data in items:
+            item_name = (item_data.get("name") or "").strip()
+            description = (item_data.get("description") or "").strip()
+            barcode = item_data.get("barcode", "")
+            barserial = item_data.get("barserial", "")
+            cost_price = item_data.get("cost_price", "").strip()
+            market_item_title = item_data.get("market_item", "").strip()
+
+            if not item_name:
+                results.append({
+                    "barcode": barcode,
+                    "barserial": barserial,
+                    "success": False,
+                    "error": "Missing item name"
+                })
+                continue
+
+            # If item has a linked MarketItem, use its title directly
+            linked_market_item = None
+            try:
+                linked_market_item = MarketItem.objects.get(
+                    title__iexact=market_item_title) if market_item_title else None
+            except MarketItem.DoesNotExist:
+                pass
+
+            search_query = linked_market_item.title if linked_market_item else item_name
+
+            # Get competitor data for the linked MarketItem
+            competitor_data_for_ai = get_competitor_data(search_query, include_url=False)
+            competitor_data_for_frontend = get_competitor_data(search_query, include_url=True)
+            # If no competitor data found, trigger scraping
+            if not competitor_data_for_ai.strip():
+                print(f"No competitor listings found for '{search_query}'. Triggering scrape...")
+                scrape_all_competitors(search_query)
+
+                # Re-fetch after scraping
+                competitor_data_for_ai = get_competitor_data(search_query, include_url=False)
+                competitor_data_for_frontend = get_competitor_data(search_query, include_url=True)
+
+            prompt = build_price_analysis_prompt(
+                item_name=item_name,
+                description=description,
+                competitor_data=competitor_data_for_ai,
+                cost_price=cost_price,  # optional
+                market_item_title=market_item_title  # optional
+            )
+
+            ai_response = call_gemini_sync(prompt)
+            reasoning, suggested_price = split_reasoning_and_price(ai_response)
+
+            # Get or create inventory item
+            inventory_defaults = {"description": description}
+            if barserial:  # only include serial_number if it exists
+                inventory_defaults["serial_number"] = barserial
+
+            inventory_item, _ = InventoryItem.objects.update_or_create(
+                title=item_name,
+                defaults=inventory_defaults,
+            )
+
+            competitor_count = len(competitor_data_for_frontend.strip().split("\n")) if (
+                competitor_data_for_frontend.strip()) else 0
+
+            # Extract decimal price for database
+            decimal_price = None
+            price_match = re.search(r"£(\d+\.?\d*)", suggested_price)
+            if price_match:
+                decimal_price = float(price_match.group(1))
+
+            # Save analysis
+            analysis, created = PriceAnalysis.objects.update_or_create(
+                item=inventory_item,
+                defaults={
+                    "reasoning": reasoning,
+                    "suggested_price": decimal_price,
+                    "confidence": min(100, competitor_count * 15),
+                    "created_at": datetime.now()
+                }
+            )
+
+            print(description)
+            print(barserial)
+            results.append({
+                "barcode": barcode,
+                "barserial": barserial,
+                "success": True,
+                "suggested_price": suggested_price,
+                "reasoning": reasoning,
+                "competitor_data": competitor_data_for_frontend,
+                "competitor_count": competitor_count,
+                "item_name": item_name,
+                "search_query_used": search_query,  # For debugging
+                "analysis_id": analysis.id,  # send back to frontend
+                "item_description": inventory_item.description,  # include saved description
+                "serial_number": inventory_item.serial_number,  # include saved serial_number
+            })
+
+        return JsonResponse({
+            "success": True,
+            "results": results
+        })
+
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return JsonResponse({"success": False, "error": str(e)}, status=500)
+
+from automation.scrape_nospos import scrape_barcodes
+import asyncio
+@csrf_exempt
+def scrape_nospos_view(request):
+    if request.method != "POST":
+        return JsonResponse({"success": False, "error": "Invalid request method"})
+
+    try:
+        body = json.loads(request.body)
+        barcodes = body.get("barcodes", [])
+        if not barcodes:
+            return JsonResponse({"success": False, "error": "No barcodes provided"})
+
+        # Run the async scraping function
+        asyncio.run(scrape_barcodes(barcodes))
+
+        return JsonResponse({"success": True})
+    except Exception as e:
+        return JsonResponse({"success": False, "error": str(e)})
+
+
+@csrf_exempt
+def scan_barcodes(request):
+    if request.method != "POST":
+        return JsonResponse({"success": False, "error": "POST request required"}, status=405)
+
+    try:
+        data = json.loads(request.body)
+        barcodes = data.get("barcodes", [])
+        if not barcodes:
+            return JsonResponse({"success": False, "error": "No barcodes provided"})
+
+        # Run the async scraping function and get results
+        results = asyncio.run(scrape_barcodes(barcodes))
+
+        return JsonResponse({"success": True, "products": results})
+    except Exception as e:
+        return JsonResponse({"success": False, "error": str(e)}, status=500)
+
+
+def individual_item_analysis_view(request):
+    return render(request, "individual_item_analysis.html")
+
+@require_GET
+def price_analysis_detail(request, analysis_id):
+    analysis = get_object_or_404(PriceAnalysis.objects.select_related("item"), pk=analysis_id)
+
+    competitor_data = get_competitor_data(analysis.item.title, include_url=True)
+    competitor_lines = competitor_data.split("\n") if competitor_data else []
+
+    return JsonResponse({
+        "success": True,
+        "analysis_id": analysis.id,
+        "item_title": analysis.item.title,
+        "suggested_price": analysis.suggested_price,
+        "reasoning": analysis.reasoning,
+        "confidence": analysis.confidence,
+        "created_at": analysis.created_at,
+        "competitor_data": competitor_lines,
+        "competitor_count": len(competitor_lines),
+        "item_description": analysis.item.description,   # <-- add this
+        "serial_number": analysis.item.serial_number,     # <-- add this
+    })
+
+
+def home_view(request):
+    return render(request, "home.html")

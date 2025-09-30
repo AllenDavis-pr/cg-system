@@ -1,0 +1,830 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Pricing Analysis - View Only</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  a { color: #ffffff !important; text-decoration: underline !important; }
+  a:visited { color: #888888 !important; text-decoration: underline !important; }
+  
+  * {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+  }
+
+  body {
+    font-family: 'Inter', sans-serif;
+    background-color: #000000;
+    color: #ffffff;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    font-size: 14px;
+  }
+
+  .header {
+    padding: 20px;
+    border-bottom: 1px solid #333333;
+    background-color: #111111;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .header h1 {
+    font-size: 18px;
+    font-weight: 600;
+    color: #ffffff;
+    letter-spacing: 0.5px;
+  }
+
+  .main-content {
+    flex: 1;
+    display: flex;
+    min-height: 0;
+  }
+
+  .input-panel {
+    width: 400px;
+    border-right: 1px solid #333333;
+    background-color: #111111;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .competitor-panel {
+    flex: 1;
+    background-color: #0a0a0a;
+    padding: 20px;
+    overflow-y: auto;
+  }
+
+  .panel-title {
+    font-size: 12px;
+    font-weight: 600;
+    color: #888888;
+    margin-bottom: 16px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  .input-group {
+    margin-bottom: 16px;
+  }
+
+  .input-label {
+    display: block;
+    font-size: 11px;
+    color: #888888;
+    margin-bottom: 4px;
+    font-weight: 600;
+    text-transform: uppercase;
+  }
+
+  .input-field {
+    width: 100%;
+    padding: 12px;
+    background-color: #1a1a1a;
+    border: 1px solid #333333;
+    color: #ffffff;
+    font-family: 'Inter', sans-serif;
+    font-size: 14px;
+    border-radius: 4px;
+    cursor: not-allowed;
+  }
+
+  .input-row {
+    display: flex;
+    gap: 12px;
+  }
+
+  .description-field {
+    min-height: 100px;
+    resize: none;
+  }
+
+  .load-button {
+    padding: 16px 24px;
+    background-color: #ffffff;
+    color: #000000;
+    border: none;
+    font-family: 'Inter', sans-serif;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-top: 20px;
+    border-radius: 4px;
+  }
+
+  .load-button:hover:not(:disabled) {
+    background-color: #e6e6e6;
+  }
+
+  .load-button:disabled {
+    background-color: #333333;
+    color: #666666;
+    cursor: not-allowed;
+  }
+
+  .competitor-count {
+    font-size: 12px;
+    color: #666666;
+    margin-bottom: 16px;
+  }
+
+  .competitor-table {
+    border: 1px solid #333333;
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 20px;
+  }
+
+  .competitor-table th,
+  .competitor-table td {
+    padding: 12px;
+    text-align: left;
+    border-bottom: 1px solid #333333;
+    font-size: 13px;
+  }
+
+  .competitor-table th {
+    background-color: #1a1a1a;
+    color: #888888;
+    font-weight: 600;
+    text-transform: uppercase;
+    font-size: 11px;
+  }
+
+  .market-stats {
+    background-color: #111111;
+    padding: 16px;
+    border: 1px solid #333333;
+    margin-bottom: 20px;
+    border-radius: 4px;
+  }
+
+  .stat-row {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 8px;
+    font-size: 13px;
+  }
+
+  .stat-label {
+    color: #888888;
+    text-transform: uppercase;
+    font-size: 11px;
+  }
+
+  .stat-value {
+    color: #ffffff;
+    font-weight: 600;
+  }
+
+  .warning {
+    background-color: #1a1100;
+    border: 1px solid #444400;
+    padding: 12px;
+    margin-bottom: 20px;
+    color: #ffff88;
+    font-size: 12px;
+    border-radius: 4px;
+  }
+
+  .analysis-section {
+    background-color: #111111;
+    border-top: 1px solid #333333;
+    padding: 20px;
+    max-height: 40vh;
+    overflow-y: auto;
+  }
+
+  .analysis-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 16px;
+  }
+
+  .analysis-status {
+    font-size: 12px;
+    color: #00ff00;
+    font-weight: 600;
+    text-transform: uppercase;
+  }
+
+  .analysis-time {
+    font-size: 11px;
+    color: #666666;
+  }
+
+  .recommended-price {
+    font-size: 24px;
+    font-weight: 600;
+    color: #ffffff;
+    margin-bottom: 20px;
+  }
+
+  .reasoning {
+    margin-bottom: 20px;
+  }
+
+  .reasoning-title {
+    font-size: 12px;
+    color: #888888;
+    font-weight: 600;
+    text-transform: uppercase;
+    margin-bottom: 8px;
+  }
+
+  .reasoning-text {
+    font-size: 13px;
+    line-height: 1.6;
+    color: #cccccc;
+  }
+
+  .confidence-bar {
+    margin-bottom: 20px;
+  }
+
+  .confidence-label {
+    font-size: 11px;
+    color: #888888;
+    text-transform: uppercase;
+    margin-bottom: 4px;
+  }
+
+  .confidence-track {
+    width: 200px;
+    height: 8px;
+    background-color: #333333;
+    border: 1px solid #555555;
+    border-radius: 4px;
+  }
+
+  .confidence-fill {
+    height: 100%;
+    background-color: #ffffff;
+    transition: width 0.3s ease;
+  }
+
+  .controls {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    margin-bottom: 16px;
+    flex-wrap: wrap;
+  }
+
+  .controls label {
+    font-size: 11px;
+    font-weight: 600;
+    color: #888888;
+    text-transform: uppercase;
+    margin-right: 4px;
+  }
+
+  .controls select {
+    padding: 6px 10px;
+    background-color: #1a1a1a;
+    border: 1px solid #333333;
+    border-radius: 4px;
+    color: #ffffff;
+    font-size: 12px;
+    cursor: pointer;
+    min-width: 140px;
+    transition: border-color 0.2s ease, background-color 0.2s ease;
+  }
+
+  .controls select:focus {
+    outline: none;
+    border-color: #555555;
+    background-color: #222222;
+  }
+
+  .modal-input {
+        width: 100%;
+        padding: 12px;
+        background-color: #1a1a1a;
+        border: 1px solid #333333;
+        color: #ffffff;
+        font-family: 'Inter', sans-serif;
+        font-size: 14px;
+        border-radius: 4px;
+        margin-bottom: 12px;
+    }
+
+    .modal-submit {
+        padding: 12px 20px;
+        background-color: #ffffff;
+        color: #000000;
+        border: none;
+        font-family: 'Inter', sans-serif;
+        font-weight: 600;
+        font-size: 14px;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        cursor: pointer;
+        border-radius: 4px;
+    }
+
+    .modal-submit:hover {
+        background-color: #e6e6e6;
+    }
+
+    .modal-close {
+        padding: 12px 20px;
+        background-color: #333333;
+        color: #888888;
+        border: none;
+        font-weight: 600;
+        cursor: pointer;
+        border-radius: 4px;
+        margin-left: 12px;
+    }
+
+    .modal-close:hover {
+        background-color: #555555;
+        color: #ffffff;
+    }
+
+
+  .loading-spinner {
+    display: inline-block;
+    width: 16px;
+    height: 16px;
+    border: 2px solid #333333;
+    border-top: 2px solid #ffffff;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+  }
+
+  @keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+  }
+
+  .empty-state {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    color: #666666;
+    font-size: 14px;
+    text-align: center;
+  }
+
+  .hidden {
+    display: none;
+  }
+
+  .item-selector {
+    margin-bottom: 20px;
+  }
+
+  .item-selector select {
+    width: 100%;
+    padding: 12px;
+    background-color: #1a1a1a;
+    border: 1px solid #333333;
+    color: #ffffff;
+    font-family: 'Inter', sans-serif;
+    font-size: 14px;
+    border-radius: 4px;
+    cursor: pointer;
+  }
+
+  .item-selector select:focus {
+    outline: none;
+    border-color: #555555;
+    background-color: #222222;
+  }
+
+  .readonly-field {
+    background-color: #0f0f0f !important;
+    cursor: default;
+  }
+</style>
+</head>
+<body>
+
+<div id="reusable-list-modal" class="hidden" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.6); justify-content:center; align-items:center; z-index:1000;">
+  <div style="background:#111; padding:20px; border-radius:8px; width:400px; max-width:90%; color:#fff; display:flex; flex-direction:column; gap:12px;">
+    <h2 style="margin-bottom:10px;">Confirm & List Item</h2>
+    <div class="modal-fields" style="display:flex; flex-direction:column; gap:10px;"></div>
+    <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:10px;">
+      <button class="modal-close">Cancel</button>
+      <button class="modal-submit">List Item</button>
+    </div>
+  </div>
+</div>
+
+<div class="header">
+  <h1>PRICING ANALYSIS - VIEW</h1>
+  <div style="font-size: 11px; color: #666666;">CASH GENERATOR SYSTEM</div>
+</div>
+
+<div class="main-content">
+  <div class="input-panel">
+    <div class="panel-title">ANALYSIS DATA</div>
+
+    <div class="input-row">
+      <div class="input-group" style="flex: 2;">
+        <label class="input-label">Item Name</label>
+        <input type="text" id="item-name" class="input-field readonly-field" readonly>
+      </div>
+    </div>
+
+    <div class="input-group">
+      <label class="input-label">Description</label>
+      <textarea id="description" class="input-field description-field readonly-field" readonly></textarea>
+    </div>
+
+      <div class="input-group">
+      <label class="input-label">Serial Number</label>
+      <input type="text" id="serial-number" class="input-field readonly-field" readonly>
+    </div>
+
+
+  </div>
+
+  <div class="competitor-panel">
+    <div class="panel-title">COMPETITOR DATA</div>
+
+    <div class="controls">
+      <label for="sort-price">Sort by:</label>
+      <select id="sort-price">
+        <option value="none">None</option>
+        <option value="asc">Lowest → Highest</option>
+        <option value="desc">Highest → Lowest</option>
+      </select>
+
+      <label for="filter-source">Filter by:</label>
+      <select id="filter-source">
+        <option value="all">All Sources</option>
+        <option value="CashConverters">CashConverters</option>
+        <option value="CashGenerator">CashGenerator</option>
+        <option value="CeX">CeX</option>
+        <option value="eBay">eBay</option>
+      </select>
+    </div>
+
+    <div class="competitor-count" id="competitor-count">
+      SOURCES FOUND: <span id="competitor-number">0</span>
+    </div>
+
+    <table class="competitor-table" id="competitor-table">
+      <thead>
+        <tr>
+          <th>SOURCE</th>
+          <th>ITEM</th>
+          <th>PRICE</th>
+          <th>STORE</th>
+        </tr>
+      </thead>
+      <tbody id="competitor-tbody">
+        <tr>
+          <td colspan="4" style="text-align: center; color: #666666; font-style: italic;">
+            Select an item to view competitor data
+          </td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="market-stats" id="market-stats" style="display: none;">
+      <div class="stat-row">
+        <span class="stat-label">MARKET RANGE:</span>
+        <span class="stat-value" id="price-range">-</span>
+      </div>
+      <div class="stat-row">
+        <span class="stat-label">AVERAGE:</span>
+        <span class="stat-value" id="price-average">-</span>
+      </div>
+    </div>
+
+    <div class="warning" id="data-warning" style="display: none;">
+      ⚠ LIMITED DATA<br>
+      Only <span id="warning-count">0</span> competitors found. Consider additional research.
+    </div>
+  </div>
+</div>
+
+<div class="analysis-section" id="analysis-section" style="display: none;">
+  <div class="analysis-header">
+    <div class="analysis-status">📊 ANALYSIS LOADED</div>
+    <div class="analysis-time" id="analysis-time">-</div>
+  </div>
+
+  <div class="recommended-price">
+    RECOMMENDED PRICE: <span id="recommended-price">-</span>
+  </div>
+
+  <div class="reasoning">
+    <div class="reasoning-title">REASONING:</div>
+    <div class="reasoning-text" id="reasoning-text">
+      Select an item to view analysis...
+    </div>
+  </div>
+
+    <button id="confirm-list-btn" class="load-button" style="margin-bottom:20px;">
+  CONFIRM & LIST
+    </button>
+
+</div>
+
+
+<script>
+// Global storage for data
+let allCompetitorRows = [];
+let analysisData = {};
+
+// Load items on page load
+document.addEventListener('DOMContentLoaded', function() {
+
+    // Check for URL parameters
+    const urlParams = new URLSearchParams(window.location.search);
+    const analysisId = urlParams.get('analysis_id');
+
+    if (analysisId) {
+        loadAnalysisById(analysisId);
+    }
+
+});
+
+
+// Load analysis for selected item
+async function loadAnalysisById(analysisId) {
+    try {
+        const response = await fetch(`/api/price-analysis/${analysisId}/`);
+        const data = await response.json();
+
+        if (data.success) {
+            // populate directly
+            document.getElementById('item-name').value = data.item_title || '';
+            document.getElementById('description').value = data.item_description || '';
+            document.getElementById('serial-number').value = data.serial_number || ''; // <-- new line
+
+            console.log(data.serial_number)
+            // analysis
+            document.getElementById('recommended-price').textContent = `£${data.suggested_price}`;
+            document.getElementById('reasoning-text').textContent = data.reasoning || 'No reasoning provided';
+
+            if (data.created_at) {
+                const date = new Date(data.created_at);
+                document.getElementById('analysis-time').textContent = date.toLocaleDateString() + ' ' + date.toLocaleTimeString();
+            }
+
+            document.getElementById('analysis-section').style.display = 'block';
+
+            // competitors
+            updateCompetitorData(data.competitor_data || '', data.competitor_count || 0);
+        } else {
+            alert(`Error: ${data.error}`);
+        }
+    } catch (err) {
+        console.error('Error fetching analysis:', err);
+        alert('Could not fetch analysis data.');
+    }
+}
+
+
+// Display item information
+function displayItemData(item) {
+    document.getElementById('item-name').value = item.title || '';
+    document.getElementById('description').value = item.description || '';
+    document.getElementById('serial-number').value = item.serial_number || '';
+    document.getElementById('market-item').value = item.market_item || 'No market item linked';
+}
+
+// Display analysis results
+function displayAnalysisData(analysis) {
+    const analysisSection = document.getElementById('analysis-section');
+    const recommendedPrice = document.getElementById('recommended-price');
+    const reasoningText = document.getElementById('reasoning-text');
+    const analysisTime = document.getElementById('analysis-time');
+
+    recommendedPrice.textContent = `£${analysis.suggested_price}`;
+    reasoningText.textContent = analysis.reasoning || 'No reasoning provided';
+
+
+    // Format creation date
+    if (analysis.created_at) {
+        const date = new Date(analysis.created_at);
+        analysisTime.textContent = date.toLocaleDateString() + ' ' + date.toLocaleTimeString();
+    }
+
+    analysisSection.style.display = 'block';
+    analysisSection.scrollIntoView({ behavior: 'smooth' });
+}
+
+// Update competitor data table
+function updateCompetitorData(competitorData, competitorCount) {
+    const tbody = document.getElementById('competitor-tbody');
+    const competitorNumber = document.getElementById('competitor-number');
+    const marketStats = document.getElementById('market-stats');
+    const dataWarning = document.getElementById('data-warning');
+    const warningCount = document.getElementById('warning-count');
+
+    competitorNumber.textContent = competitorCount;
+    allCompetitorRows = [];
+
+    if (!competitorData || competitorData.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="4" style="text-align: center; color: #666666; font-style: italic;">No competitor data available</td></tr>';
+        marketStats.style.display = 'none';
+        dataWarning.style.display = 'none';
+        return;
+    }
+
+    const prices = [];
+    tbody.innerHTML = '';
+
+    competitorData.forEach(line => {
+        if (!line.trim()) return;
+        const parts = line.split(' | ');
+        if (parts.length >= 5) {
+            const competitor = parts[0];
+            const listingTitle = parts[1];
+            const price = parts[2];
+            const storeName = parts[3];
+            const url = parts[4];
+
+            const numericPrice = parseFloat(price.replace(/[^0-9.-]+/g, ""));
+            if (!isNaN(numericPrice)) prices.push(numericPrice);
+
+            const row = document.createElement('tr');
+            row.innerHTML = `
+                <td>${competitor}</td>
+                <td><a href="${url}" target="_blank" rel="noopener noreferrer" style="color: #8fb4ff;">${listingTitle}</a></td>
+                <td>${price}</td>
+                <td>${storeName}</td>
+            `;
+            allCompetitorRows.push(row);
+        }
+    });
+
+    if (prices.length > 0) {
+        const minPrice = Math.min(...prices);
+        const maxPrice = Math.max(...prices);
+        const avgPrice = prices.reduce((a, b) => a + b, 0) / prices.length;
+
+        document.getElementById('price-range').textContent = `£${minPrice} - £${maxPrice}`;
+        document.getElementById('price-average').textContent = `£${avgPrice.toFixed(0)}`;
+        marketStats.style.display = 'block';
+
+        if (competitorCount <= 2) {
+            warningCount.textContent = competitorCount;
+            dataWarning.style.display = 'block';
+        } else {
+            dataWarning.style.display = 'none';
+        }
+    }
+
+    applySortAndFilter();
+}
+
+// Apply sorting and filtering
+function applySortAndFilter() {
+    const tbody = document.getElementById('competitor-tbody');
+    let rows = [...allCompetitorRows];
+
+    const sortValue = document.getElementById('sort-price').value;
+    const filterValue = document.getElementById('filter-source').value.toLowerCase();
+
+    // Filter
+    rows = rows.filter(row => {
+        if (row.cells[0].colSpan === 4) return false;
+        const source = row.cells[0].textContent.trim().toLowerCase();
+        return filterValue === 'all' || source === filterValue;
+    });
+
+    // Sort
+    if (sortValue !== 'none') {
+        rows.sort((a, b) => {
+            const priceA = parseFloat(a.cells[2].textContent.replace(/[^0-9.-]+/g, ""));
+            const priceB = parseFloat(b.cells[2].textContent.replace(/[^0-9.-]+/g, ""));
+            return sortValue === 'asc' ? priceA - priceB : priceB - priceA;
+        });
+    }
+
+    // Render
+    tbody.innerHTML = '';
+    if (rows.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="4" style="text-align: center; color: #666666; font-style: italic;">No competitor data matches filter</td></tr>';
+    } else {
+        rows.forEach(row => tbody.appendChild(row));
+    }
+
+    document.getElementById('competitor-number').textContent = rows.length;
+}
+
+// Add event listeners for controls
+document.getElementById('sort-price').addEventListener('change', applySortAndFilter);
+document.getElementById('filter-source').addEventListener('change', applySortAndFilter);
+
+// Reusable modal
+const confirmListBtn = document.getElementById('confirm-list-btn');
+const reusableModal = document.getElementById('reusable-list-modal');
+const modalFieldsContainer = reusableModal.querySelector('.modal-fields');
+const modalCloseBtns = reusableModal.querySelectorAll('.modal-close');
+const modalSubmitBtn = reusableModal.querySelector('.modal-submit');
+
+// Open modal on button click
+confirmListBtn.addEventListener('click', () => {
+    reusableModal.style.display = 'flex';
+    reusableModal.classList.remove('hidden');
+
+       modalFieldsContainer.innerHTML = `
+        <label>Item Name</label>
+        <input type="text" class="modal-input" value="${document.getElementById('item-name').value}">
+
+        <label>Description</label>
+        <textarea class="modal-input">${document.getElementById('description').value}</textarea>
+
+        <label>Serial Number</label>
+        <input type="text" class="modal-input" value="${document.getElementById('serial-number')?.value || ''}">
+
+        <label>Price</label>
+        <input type="text" class="modal-input" value="${document.getElementById('recommended-price').textContent.replace(/[^0-9.]+/g,'')}">
+    `;
+
+});
+
+// Close modal
+modalCloseBtns.forEach(btn => btn.addEventListener('click', () => {
+    reusableModal.style.display = 'none';
+    reusableModal.classList.add('hidden');
+}));
+
+// Submit modal to backend
+modalSubmitBtn.addEventListener('click', async () => {
+    modalSubmitBtn.disabled = true;
+    modalSubmitBtn.textContent = 'Launching Automation...';
+
+    const inputs = modalFieldsContainer.querySelectorAll('input, textarea');
+    const payload = {
+        item_name: inputs[0].value,
+        description: inputs[1].value,
+        serial_number: inputs[2].value,
+        price: inputs[3].value
+    };
+
+    try {
+        const response = await fetch('/launch-playwright-listing/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCookie('csrftoken')
+            },
+            body: JSON.stringify(payload)
+        });
+
+        const result = await response.json();
+
+        if (result.success) {
+            setTimeout(() => {
+                modalSubmitBtn.textContent = 'Automation Complete! Run Again?';
+                modalSubmitBtn.disabled = false;
+            }, 2000);
+        } else {
+            alert(`Automation failed: ${result.error}`);
+            modalSubmitBtn.disabled = false;
+            modalSubmitBtn.textContent = 'List Item';
+        }
+    } catch (err) {
+        console.error('Error launching automation:', err);
+        alert('Failed to launch automation. Please try again.');
+        modalSubmitBtn.disabled = false;
+        modalSubmitBtn.textContent = 'List Item';
+    }
+});
+
+// Helper for CSRF token
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i=0; i<cookies.length; i++){
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length+1) === (name+'=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length+1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
+
+</script>
+
+
+
+
+</body>
+</html>
