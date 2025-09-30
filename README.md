@@ -10,25 +10,6 @@ A Django-based pricing tool for second-hand retailers. Scrapes competitor prices
 - Tracks inventory and links items to market categories
 - Automates listing process with Playwright
 
-## Quick start
-
-1. Set your Google API key:
-   ```bash
-   export GOOGLE_API_KEY="your_gemini_api_key"
-   ```
-
-2. Install dependencies, this is in requirements.md
-
-3. Run migrations:
-   ```bash
-   python manage.py migrate
-   ```
-
-4. Start the server:
-   ```bash
-   python manage.py runserver
-   ```
-
 ## Main features
 
 ### Individual item analysis
