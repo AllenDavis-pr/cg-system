@@ -1,8 +1,8 @@
 {% extends "base_item_analysis.html" %}
 
-{% block title %}Buying Price Analysis{% endblock %}
+{% block title %}Buying Analysis{% endblock %}
 
-{% block header_title %}BUYING PRICE ANALYSIS{% endblock %}
+{% block header_title %}BUYING ANALYSIS{% endblock %}
 
 {% block panel_title %}INPUT PANEL{% endblock %}
 
@@ -25,11 +25,6 @@
   <input type="text" id="serial-number" class="input-field" placeholder="Enter serial number">
 </div>
 
-<div class="input-group">
-  <label class="input-label">Target Margin (%)</label>
-  <input type="number" id="target-margin" class="input-field" value="37.5" step="0.1" min="0" max="100">
-</div>
-
 <button type="button" id="analyze-btn" class="analyze-button" onclick="analyzeItem()">
   <span id="button-text">ANALYZE PRICING</span>
   <span id="button-spinner" class="loading-spinner hidden"></span>
@@ -37,6 +32,9 @@
 {% endblock %}
 
 {% block analysis_actions %}
+<button id="confirm-list-btn" class="analyze-button" style="margin-bottom:20px;">
+  CONFIRM & LIST
+</button>
 {% endblock %}
 
 {% block confidence_section %}
@@ -48,115 +46,181 @@
 </div>
 {% endblock %}
 
-{% block extra_style %}
-.buying-price-panel {
-  background-color: #111111;
-  border-top: 1px solid #333333;
-  padding: 20px;
-  margin-top: 20px;
-}
-
-.price-range-container {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  margin: 20px 0;
-}
-
-.price-range-bar {
-  flex: 1;
-  height: 20px;
-  background: #333333;
-  border-radius: 10px;
-  position: relative;
-  overflow: hidden;
-}
-
-.price-range-fill {
-  height: 100%;
-  background: linear-gradient(90deg, #ff4444, #ffff44, #44ff44);
-  border-radius: 10px;
-}
-
-.price-range-labels {
-  display: flex;
-  justify-content: space-between;
-  font-size: 11px;
-  color: #888888;
-  margin-top: 8px;
-}
-
-.buying-price-stats {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 16px;
-  margin: 20px 0;
-}
-
-.price-card {
-  background: #1a1a1a;
-  border: 1px solid #333333;
-  padding: 16px;
-  border-radius: 4px;
-}
-
-.price-card .label {
-  font-size: 11px;
-  color: #888888;
-  text-transform: uppercase;
-  margin-bottom: 8px;
-}
-
-.price-card .value {
-  font-size: 18px;
-  font-weight: 600;
-  color: #ffffff;
-}
-{% endblock %}
-
 {% block modals %}
-{% endblock %}
+<div id="list-modal" class="hidden" style="
+    position: fixed;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    background-color: rgba(0,0,0,0.8);
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+">
+  <div style="
+      background-color: #111;
+      border: 1px solid #333;
+      border-radius: 8px;
+      width: 480px;
+      max-width: 90%;
+      padding: 20px;
+      color: #fff;
+      position: relative;
+      display: flex;
+      flex-direction: column;
+  ">
+    <span id="modal-close" style="
+        position: absolute;
+        top: 12px;
+        right: 16px;
+        cursor: pointer;
+        font-size: 18px;
+        color: #888;
+    ">&times;</span>
 
+    <h2 style="margin-bottom: 16px; font-size: 16px; text-transform: uppercase;">Confirm Listing</h2>
 
-{% block buying_price_panel %}
-<div class="buying-price-panel" id="buying-price-panel" style="display: none;">
-  <div class="panel-title">BUYING PRICE ANALYSIS</div>
-  
-  <div class="buying-price-stats">
-    <div class="price-card">
-      <div class="label">Suggested Selling Price</div>
-      <div class="value" id="selling-price">-</div>
+    <div style="margin-bottom: 12px;">
+      <label style="font-size: 11px; color: #888; text-transform: uppercase;">Item Name</label>
+      <input id="modal-item-name" type="text" style="
+          width: 100%;
+          padding: 10px;
+          background-color: #1a1a1a;
+          border: 1px solid #333;
+          color: #fff;
+          border-radius: 4px;
+          margin-top: 4px;
+      ">
     </div>
-    <div class="price-card">
-      <div class="label">Minimum Buying Price</div>
-      <div class="value" id="min-buying-price">-</div>
-    </div>
-    <div class="price-card">
-      <div class="label">Maximum Buying Price</div>
-      <div class="value" id="max-buying-price">-</div>
-    </div>
-    <div class="price-card">
-      <div class="label">Target Margin</div>
-      <div class="value">{{ target_margin|default:"37.5" }}%</div>
-    </div>
-  </div>
 
-  <div class="price-range-container">
-    <div class="price-range-bar">
-      <div class="price-range-fill" id="price-range-fill"></div>
+    <div style="margin-bottom: 12px;">
+      <label style="font-size: 11px; color: #888; text-transform: uppercase;">Description</label>
+      <textarea id="modal-description" style="
+          width: 100%;
+          padding: 10px;
+          background-color: #1a1a1a;
+          border: 1px solid #333;
+          color: #fff;
+          border-radius: 4px;
+          min-height: 80px;
+          margin-top: 4px;
+          resize: vertical;
+          max-height: 400px;
+      "></textarea>
     </div>
-  </div>
-  <div class="price-range-labels">
-    <span>£0</span>
-    <span id="max-price-label">-</span>
+
+    <div style="margin-bottom: 16px;">
+      <label style="font-size: 11px; color: #888; text-transform: uppercase;">Serial Number</label>
+      <input id="modal-serial-number" type="text" style="
+          width: 100%;
+          padding: 10px;
+          background-color: #1a1a1a;
+          border: 1px solid #333;
+          color: #fff;
+          border-radius: 4px;
+          margin-top: 4px;
+      ">
+    </div>
+
+    <div style="margin-bottom: 16px;">
+      <label style="font-size: 11px; color: #888; text-transform: uppercase;">Price</label>
+      <input id="modal-price" type="text" style="
+          width: 100%;
+          padding: 10px;
+          background-color: #1a1a1a;
+          border: 1px solid #333;
+          color: #fff;
+          border-radius: 4px;
+          margin-top: 4px;
+      ">
+    </div>
+
+    <button id="modal-submit" style="
+        width: 100%;
+        padding: 14px;
+        background-color: #fff;
+        color: #000;
+        font-weight: 600;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        text-transform: uppercase;
+    ">List Item</button>
   </div>
 </div>
-
 {% endblock %}
 
-
 {% block extra_script %}
+const modal = document.getElementById('list-modal');
+const modalClose = document.getElementById('modal-close');
+const modalItemName = document.getElementById('modal-item-name');
+const modalDescription = document.getElementById('modal-description');
+const modalPrice = document.getElementById('modal-price');
+const confirmListBtn = document.getElementById('confirm-list-btn');
+const modalSubmitBtn = document.getElementById('modal-submit');
 
+modal.classList.add('hidden');
+modal.style.display = 'none';
+
+confirmListBtn.addEventListener('click', () => {
+    modal.style.display = 'flex';
+    modal.classList.remove('hidden');
+
+    modalItemName.value = document.getElementById('item-name').value;
+    modalDescription.value = document.getElementById('description').value;
+    modalPrice.value = document.getElementById('recommended-price').textContent.replace(/[^0-9.]+/g, '');
+    document.getElementById('modal-serial-number').value = document.getElementById('serial-number').value;
+});
+
+modalClose.addEventListener('click', () => {
+    modal.style.display = 'none';
+    modal.classList.add('hidden');
+});
+
+window.addEventListener('click', (e) => {
+    if (e.target === modal) {
+        modal.style.display = 'none';
+        modal.classList.add('hidden');
+    }
+});
+
+modalSubmitBtn.addEventListener('click', async function() {
+    modalSubmitBtn.disabled = true;
+    modalSubmitBtn.textContent = 'Launching Automation...';
+
+    try {
+        const response = await fetch('/launch-playwright-listing/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCookie('csrftoken')
+            },
+            body: JSON.stringify({
+                item_name: modalItemName.value,
+                description: modalDescription.value,
+                price: modalPrice.value,
+                serial_number: document.getElementById('modal-serial-number').value
+            })
+        });
+
+        const result = await response.json();
+
+        if (result.success) {
+            setTimeout(() => {
+                modalSubmitBtn.textContent = '✅ Automation Complete!';
+                modalSubmitBtn.disabled = false;
+            }, 2000);
+        } else {
+            alert(`Automation failed: ${result.error}`);
+            modalSubmitBtn.disabled = false;
+            modalSubmitBtn.textContent = 'List Item';
+        }
+    } catch (error) {
+        console.error('Error launching automation:', error);
+        alert('Failed to launch automation. Please try again.');
+        modalSubmitBtn.disabled = false;
+        modalSubmitBtn.textContent = 'List Item';
+    }
+});
 
 function displayAnalysis(reasoning, suggestedPrice) {
     const analysisSection = document.getElementById('analysis-section');
@@ -179,31 +243,6 @@ function displayAnalysis(reasoning, suggestedPrice) {
 
     analysisSection.style.display = 'block';
     analysisSection.scrollIntoView({ behavior: 'smooth' });
-
-    // Calculate and display buying prices
-    calculateBuyingPrices(suggestedPrice);
-    document.getElementById('buying-price-panel').style.display = 'block';
-
-}
-
-function calculateBuyingPrices(sellingPrice) {
-    const margin = parseFloat(document.getElementById('target-margin').value) / 100;
-    const sellingPriceNum = parseFloat(sellingPrice.replace(/[^0-9.-]+/g, ""));
-    
-    if (isNaN(sellingPriceNum)) return;
-
-    const minBuyingPrice = sellingPriceNum * (1 - margin);
-    const maxBuyingPrice = sellingPriceNum * (1 - margin * 0.8); // 20% buffer for negotiation
-    
-    document.getElementById('selling-price').textContent = `£${sellingPriceNum.toFixed(2)}`;
-    document.getElementById('min-buying-price').textContent = `£${minBuyingPrice.toFixed(2)}`;
-    document.getElementById('max-buying-price').textContent = `£${maxBuyingPrice.toFixed(2)}`;
-    
-    // Update price range visualization
-    const rangeFill = document.getElementById('price-range-fill');
-    const minPos = (minBuyingPrice / sellingPriceNum) * 100;
-    const maxPos = (maxBuyingPrice / sellingPriceNum) * 100;
-    rangeFill.style.width = `${maxPos}%`;
 }
 
 async function analyzeItem() {
@@ -251,14 +290,6 @@ async function analyzeItem() {
         buttonSpinner.classList.add('hidden');
     }
 }
-
-// Add event listener for margin changes
-document.getElementById('target-margin').addEventListener('change', function() {
-    const sellingPrice = document.getElementById('recommended-price').textContent;
-    if (sellingPrice && sellingPrice !== '-') {
-        calculateBuyingPrices(sellingPrice);
-    }
-});
 
 document.getElementById('description').addEventListener('keydown', function(e) {
     if (e.key === 'Enter' && e.ctrlKey) {
