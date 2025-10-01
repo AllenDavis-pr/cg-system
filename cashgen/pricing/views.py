@@ -1,11 +1,13 @@
 from django.shortcuts import render
 from django.http import JsonResponse
+from django.shortcuts import get_object_or_404
 from django.db.models import Q, Prefetch
+from django.utils import timezone
+
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST, require_GET
 from pricing.models import InventoryItem, MarketItem, CompetitorListing, PriceAnalysis
 from datetime import datetime
-from django.shortcuts import get_object_or_404
 
 import google.generativeai as genai
 from google.generativeai import GenerationConfig
@@ -229,7 +231,7 @@ def save_analysis_to_db(item_name, description, reasoning, suggested_price, comp
             "reasoning": reasoning,
             "suggested_price": decimal_price,
             "confidence": calculate_confidence(competitor_count),
-            "created_at": datetime.now()
+            "created_at": timezone.now()
         }
     )
     

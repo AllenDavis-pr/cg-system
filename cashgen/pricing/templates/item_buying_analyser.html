@@ -21,8 +21,8 @@
 </div>
 
 <div class="input-group">
-  <label class="input-label">Serial Number</label>
-  <input type="text" id="serial-number" class="input-field" placeholder="Enter serial number">
+  <label class="input-label">Minimum Margin (%)</label>
+  <input type="number" id="minimum-margin" class="input-field" placeholder="37.5" value="37.5" step="0.1" min="0" max="100">
 </div>
 
 <button type="button" id="analyze-btn" class="analyze-button" onclick="analyzeItem()">
@@ -31,122 +31,155 @@
 </button>
 {% endblock %}
 
-{% block analysis_actions %}
-<button id="confirm-list-btn" class="analyze-button" style="margin-bottom:20px;">
-  CONFIRM & LIST
-</button>
+{% block extra_style %}
+{{ block.super }}
+.price-panels-container {
+  display: flex;
+  gap: 20px;
+  align-items: stretch;
+  margin-bottom: 20px;
+}
+
+.price-panel {
+  flex: 1;
+  background-color: #1a1a1a;
+  border: 1px solid #333;
+  border-radius: 8px;
+  padding: 20px;
+}
+
+.price-panel-label {
+  font-size: 16px;
+  color: #888;
+  text-transform: uppercase;
+  margin-bottom: 8px;
+  font-weight: 600;
+  text-align: center;
+}
+
+.price-panel-value {
+  font-size: 32px;
+  font-weight: 700;
+  color: #fff;
+  text-align: center
+}
+
+.buying-range-display {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  width: 100%;
+  align-items: center;
+  justify-content: center; 
+}
+
+.buying-price-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+
+}
+
+
+.buying-price-separator {
+  font-size: 24px;
+  color: #666;
+}
+
+
+.buying-price-value {
+  font-size: 28px;
+  font-weight: 700;
+  color: #4ade80;
+}
+
+.buying-price-sublabel {
+  font-size: 10px;
+  color: #666;
+  text-transform: uppercase;
+  margin-top: 4px;
+}
+
+.price-separator {
+  width: 1px;
+  background-color: #333;
+  align-self: stretch;
+}
+
+.reasoning-panel {
+  background-color: #1a1a1a;
+  border: 1px solid #333;
+  border-radius: 8px;
+  padding: 20px;
+  margin-bottom: 20px;
+}
+
+.reasoning-panel-label {
+  font-size: 11px;
+  color: #888;
+  text-transform: uppercase;
+  margin-bottom: 12px;
+  font-weight: 600;
+}
+
+.reasoning-panel-text {
+  color: #ccc;
+  line-height: 1.6;
+  font-size: 14px;
+}
+
+/* Hide the entire analysis section by default */
+.analysis-results {
+  display: none;
+}
+
+/* Hide the default analysis section elements */
+.recommended-price {
+  display: none;
+}
+
+.reasoning {
+  display: none;
+}
 {% endblock %}
 
-{% block confidence_section %}
-<div class="confidence-bar">
-  <div class="confidence-label">CONFIDENCE: <span id="confidence-percent">0%</span></div>
-  <div class="confidence-track">
-    <div class="confidence-fill" id="confidence-fill" style="width: 0%;"></div>
+{% block buying_price_panel %}
+<div class="analysis-results" id="analysis-results">
+  <div class="price-panels-container">
+    <div class="price-panel">
+      <div class="price-panel-label">Recommended Selling Price</div>
+      <div class="price-panel-value" id="recommended-price-display">£0.00</div>
+    </div>
+
+    <div class="price-separator"></div>
+
+    <div class="price-panel">
+      <div class="price-panel-label">Recommended Buying Range</div>
+      <div class="buying-range-display">
+          <div class="buying-price-item">
+              <div class="buying-price-value" id="buying-price-min">£0.00</div>
+              <div class="buying-price-sublabel">Min</div>
+          </div>
+
+          <div class="buying-price-separator">—</div>
+
+          <div class="buying-price-item">
+              <div class="buying-price-value" id="buying-price-max">£0.00</div>
+              <div class="buying-price-sublabel">Max</div>
+          </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="reasoning-panel">
+    <div class="reasoning-panel-label">Reasoning</div>
+    <div class="reasoning-panel-text" id="reasoning-text-content">
+      Analysis will appear here...
+    </div>
   </div>
 </div>
 {% endblock %}
 
 {% block modals %}
-<div id="list-modal" class="hidden" style="
-    position: fixed;
-    top: 0; left: 0;
-    width: 100%; height: 100%;
-    background-color: rgba(0,0,0,0.8);
-    justify-content: center;
-    align-items: center;
-    z-index: 1000;
-">
-  <div style="
-      background-color: #111;
-      border: 1px solid #333;
-      border-radius: 8px;
-      width: 480px;
-      max-width: 90%;
-      padding: 20px;
-      color: #fff;
-      position: relative;
-      display: flex;
-      flex-direction: column;
-  ">
-    <span id="modal-close" style="
-        position: absolute;
-        top: 12px;
-        right: 16px;
-        cursor: pointer;
-        font-size: 18px;
-        color: #888;
-    ">&times;</span>
-
-    <h2 style="margin-bottom: 16px; font-size: 16px; text-transform: uppercase;">Confirm Listing</h2>
-
-    <div style="margin-bottom: 12px;">
-      <label style="font-size: 11px; color: #888; text-transform: uppercase;">Item Name</label>
-      <input id="modal-item-name" type="text" style="
-          width: 100%;
-          padding: 10px;
-          background-color: #1a1a1a;
-          border: 1px solid #333;
-          color: #fff;
-          border-radius: 4px;
-          margin-top: 4px;
-      ">
-    </div>
-
-    <div style="margin-bottom: 12px;">
-      <label style="font-size: 11px; color: #888; text-transform: uppercase;">Description</label>
-      <textarea id="modal-description" style="
-          width: 100%;
-          padding: 10px;
-          background-color: #1a1a1a;
-          border: 1px solid #333;
-          color: #fff;
-          border-radius: 4px;
-          min-height: 80px;
-          margin-top: 4px;
-          resize: vertical;
-          max-height: 400px;
-      "></textarea>
-    </div>
-
-    <div style="margin-bottom: 16px;">
-      <label style="font-size: 11px; color: #888; text-transform: uppercase;">Serial Number</label>
-      <input id="modal-serial-number" type="text" style="
-          width: 100%;
-          padding: 10px;
-          background-color: #1a1a1a;
-          border: 1px solid #333;
-          color: #fff;
-          border-radius: 4px;
-          margin-top: 4px;
-      ">
-    </div>
-
-    <div style="margin-bottom: 16px;">
-      <label style="font-size: 11px; color: #888; text-transform: uppercase;">Price</label>
-      <input id="modal-price" type="text" style="
-          width: 100%;
-          padding: 10px;
-          background-color: #1a1a1a;
-          border: 1px solid #333;
-          color: #fff;
-          border-radius: 4px;
-          margin-top: 4px;
-      ">
-    </div>
-
-    <button id="modal-submit" style="
-        width: 100%;
-        padding: 14px;
-        background-color: #fff;
-        color: #000;
-        font-weight: 600;
-        border: none;
-        border-radius: 4px;
-        cursor: pointer;
-        text-transform: uppercase;
-    ">List Item</button>
-  </div>
-</div>
 {% endblock %}
 
 {% block extra_script %}
@@ -167,7 +200,7 @@ confirmListBtn.addEventListener('click', () => {
 
     modalItemName.value = document.getElementById('item-name').value;
     modalDescription.value = document.getElementById('description').value;
-    modalPrice.value = document.getElementById('recommended-price').textContent.replace(/[^0-9.]+/g, '');
+    modalPrice.value = document.getElementById('recommended-price-display').textContent.replace(/[^0-9.]+/g, '');
     document.getElementById('modal-serial-number').value = document.getElementById('serial-number').value;
 });
 
@@ -222,28 +255,77 @@ modalSubmitBtn.addEventListener('click', async function() {
     }
 });
 
+function calculateBuyingRange(sellingPrice, marginPercent) {
+    const numPrice = parseFloat(sellingPrice.replace(/[^0-9.]/g, ''));
+    const margin = parseFloat(marginPercent) / 100;
+    
+    // Calculate max buying price based on margin
+    // If margin is 37.5%, then buying price = selling price / (1 + 0.375)
+    const maxBuying = numPrice / (1 + margin);
+    
+    // Min is 10% less than max
+    const minBuying = maxBuying * 0.9;
+    
+    return {
+        min: `£${minBuying.toFixed(2)}`,
+        max: `£${maxBuying.toFixed(2)}`
+    };
+}
+
 function displayAnalysis(reasoning, suggestedPrice) {
-    const analysisSection = document.getElementById('analysis-section');
+    const analysisResults = document.getElementById('analysis-results');
     const recommendedPrice = document.getElementById('recommended-price');
+    const recommendedPriceDisplay = document.getElementById('recommended-price-display');
+    const buyingPriceMin = document.getElementById('buying-price-min');
+    const buyingPriceMax = document.getElementById('buying-price-max');
     const reasoningText = document.getElementById('reasoning-text');
-    const confidencePercent = document.getElementById('confidence-percent');
-    const confidenceFill = document.getElementById('confidence-fill');
+    const reasoningTextContent = document.getElementById('reasoning-text-content');
     const analysisTime = document.getElementById('analysis-time');
 
+    // Show the analysis results section
+    analysisResults.style.display = 'block';
+    
+    // Update both price displays (original and new panel)
     recommendedPrice.textContent = suggestedPrice;
-    reasoningText.innerHTML = reasoning;
+    recommendedPriceDisplay.textContent = suggestedPrice;
+    
+    // Update both reasoning displays
+    if (reasoningText) reasoningText.innerHTML = reasoning;
+    if (reasoningTextContent) reasoningTextContent.innerHTML = reasoning;
 
-    const competitorCount = parseInt(document.getElementById('competitor-number').textContent);
-    let confidence = competitorCount <= 2 ? 45 : 75;
+    // Calculate buying range based on minimum margin
+    const marginPercent = document.getElementById('minimum-margin').value || 37.5;
+    const buyingRange = calculateBuyingRange(suggestedPrice, marginPercent);
+    
+    buyingPriceMin.textContent = buyingRange.min;
+    buyingPriceMax.textContent = buyingRange.max;
 
-    confidencePercent.textContent = `${confidence}%`;
-    confidenceFill.style.width = `${confidence}%`;
+    const competitorNumber = document.getElementById('competitor-number');
+    const competitorCount = competitorNumber ? parseInt(competitorNumber.textContent) : 0;
 
     analysisTime.textContent = 'just now';
 
-    analysisSection.style.display = 'block';
-    analysisSection.scrollIntoView({ behavior: 'smooth' });
+    analysisResults.scrollIntoView({ behavior: 'smooth' });
 }
+
+// Add event listener to recalculate when margin changes
+document.addEventListener('DOMContentLoaded', function() {
+    const marginInput = document.getElementById('minimum-margin');
+    
+    marginInput.addEventListener('input', function() {
+        // If analysis has been run, recalculate buying range
+        const recommendedPrice = document.getElementById('recommended-price-display');
+        const analysisResults = document.getElementById('analysis-results');
+        
+        if (analysisResults.style.display === 'block' && recommendedPrice && recommendedPrice.textContent && recommendedPrice.textContent !== '£0.00') {
+            const marginPercent = this.value || 37.5;
+            const buyingRange = calculateBuyingRange(recommendedPrice.textContent, marginPercent);
+            
+            document.getElementById('buying-price-min').textContent = buyingRange.min;
+            document.getElementById('buying-price-max').textContent = buyingRange.max;
+        }
+    });
+});
 
 async function analyzeItem() {
     const itemName = document.getElementById('item-name').value.trim();
