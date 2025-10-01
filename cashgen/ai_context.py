@@ -1,4 +1,4 @@
-data = [
+MARGINS = [
     # SMARTPHONES & MOBILE
     ("SMARTPHONES & MOBILE", "iPhone (Current Gen)", 35, 45, "Latest models, excellent condition"),
     ("SMARTPHONES & MOBILE", "iPhone (1-2 Years)", 30, 40, "High demand"),

@@ -569,12 +569,6 @@ async function checkIrrelevantCompetitors(searchQuery) {
     const tbody = document.getElementById('competitor-tbody');
     const rows = [...tbody.querySelectorAll('tr')];
 
-    console.log("tbody:", tbody);
-    console.log("all rows:", rows);
-    rows.forEach((row, i) => {
-        console.log(i, row.cells.length, row.innerHTML);
-    });
-
     // Extract competitor titles from the table
     const competitorList = rows
         .filter(row => row.cells.length >= 2)  // skip empty rows
@@ -606,7 +600,6 @@ async function checkIrrelevantCompetitors(searchQuery) {
         });
 
         const result = await response.json();
-        console.log("AI Output:", result.raw_ai_response);
         const irrelevantIndices = result.irrelevant_indices;
 
         rows.forEach((row, i) => {

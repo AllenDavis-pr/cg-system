@@ -289,6 +289,25 @@ async function analyzeItem() {
 
         if (data.success) {
             updateCompetitorData(data.competitor_data || '', data.competitor_count || 0);
+
+            // call the buying range API BEFORE displayAnalysis
+            const buyingResponse = await fetch("/api/buying-range-analysis/", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "X-CSRFToken": getCookie("csrftoken")
+                },
+                body: JSON.stringify({
+                    item_name: itemName,
+                    description: description,
+                    suggested_price: data.suggested_price,
+                    margin: document.getElementById('minimum-margin').value || 37.5
+                })
+            });
+
+            const buyingData = await buyingResponse.json();
+            console.log("Buying range AI response:", buyingData);
+
             displayAnalysis(data.reasoning, data.suggested_price);
         } else {
             alert(`Error: ${data.error}`);

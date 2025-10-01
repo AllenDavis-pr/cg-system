@@ -711,8 +711,8 @@ def detect_irrelevant_competitors(request):
 
         prompt_lines.append(
             "Task: Identify which indices are NOT relevant to the search query and description.\n"
-            "- Relevant means: it is the same product or a directly valid variation of the product searched.\n"
-            "- Irrelevant means: wrong model, accessories, games, unrelated items.\n"
+            "- Relevant means: it is the same product of the product searched.\n"
+            "- Irrelevant means: wrong model, accessories, games, unrelated items, a variation, or a different product condition (brand new vs used for several years).\n"
             "- Do not include any reasoning, only the indices.\n"
             "- IMPORTANT: Ignore the description for judging relevance unless it contains clear model or variant information. Focus primarily on product title matching."
             "- Respond ONLY with a JSON array of numbers."
@@ -738,4 +738,70 @@ def detect_irrelevant_competitors(request):
         })
 
     except Exception as e:
+        return JsonResponse({"success": False, "error": str(e)}, status=500)
+
+
+CURRENT_GEN_MODELS = {
+    "iPhone": "iPhone 17",
+    "Samsung Galaxy": "Galaxy S25",
+    "Google Pixel": "Pixel 9",
+}
+
+
+from ai_context import MARGINS
+@csrf_exempt
+@require_POST
+def buying_range_analysis(request):
+    """
+    API endpoint to calculate buying range using Gemini
+    """
+    try:
+        data = json.loads(request.body)
+        item_name = (data.get("item_name") or "").strip()
+        description = (data.get("description") or "").strip()
+        suggested_price = (data.get("suggested_price") or "").strip()
+        profit_margin = (data.get("margin") or "").strip()
+
+        if not (item_name and description and suggested_price and profit_margin):
+            return JsonResponse({"success": False, "error": "Missing required fields"}, status=400)
+
+        # Format margins nicely for Gemini
+        lines = []
+        for category, subcat, min_offer, max_offer, notes in MARGINS:
+            lines.append(f"- {category} → {subcat}: {min_offer}–{max_offer}% ({notes})")
+        margins_context = "\n".join(lines)
+
+        prompt = (
+            f"Item: {item_name}\n"
+            f"Description: {description}\n"
+            f"Selling Price: {suggested_price}\n"
+            "Company Buying Margin Rules (for context):\n"
+            f"{margins_context}\n\n"
+            "Task: Calculate an appropriate buying-in % of the selling price to offer the customer for this product, "
+            "considering the item name, description, and the price we will sell it for.\n"
+            "- We are a pawn shop.\n"
+            "- Factor in resale value & current market demand, liquidity/turnover speed (how quickly we can realistically sell), authentication/theft risk, storage/display costs, current inventory levels, and any taxes/fees.\n"
+            "- The buying price must allow achieving at least the given profit margin: {profit_margin} on the expected selling price. Use the formula: buying_price ≤ suggested_price × (1 - {profit_margin}/100). If {profit_margin} is not provided, assume 40%.\n"
+            "- Suggest BOTH a MIN and MAX %: MIN = first % of selling price we will offer the customer; MAX = the maximum % of the selling price we will pay for this product.\n"
+            f"NOTE: As of NOW, the current generation models are:\n"
+            f"- iPhone: {CURRENT_GEN_MODELS['iPhone']}\n"
+            f"- Samsung Galaxy: {CURRENT_GEN_MODELS['Samsung Galaxy']}\n"
+            f"- Google Pixel: {CURRENT_GEN_MODELS['Google Pixel']}\n"
+            "\nUse this when deciding whether a device is 'current gen', '1–2 years old', etc.\n\n"
+            "DO NOT DEVIATE FROM THE MARGINS PROVIDED."
+            "- OUTPUT FORMAT:"
+            "Reasoning: your reasoning (within 100 words)"
+            "FINAL:MIN%–MAX% (for example: FINAL:35%-45%).\n"
+        )
+
+        ai_response = call_gemini_sync(prompt)
+
+        return JsonResponse({
+            "success": True,
+            "ai_response": ai_response,
+            "prompt": prompt
+        })
+
+    except Exception as e:
+        import traceback; traceback.print_exc()
         return JsonResponse({"success": False, "error": str(e)}, status=500)
