@@ -37,15 +37,6 @@
 </button>
 {% endblock %}
 
-{% block confidence_section %}
-<div class="confidence-bar">
-  <div class="confidence-label">CONFIDENCE: <span id="confidence-percent">0%</span></div>
-  <div class="confidence-track">
-    <div class="confidence-fill" id="confidence-fill" style="width: 0%;"></div>
-  </div>
-</div>
-{% endblock %}
-
 {% block modals %}
 <div id="list-modal" class="hidden" style="
     position: fixed;
@@ -226,18 +217,12 @@ function displayAnalysis(reasoning, suggestedPrice) {
     const analysisSection = document.getElementById('analysis-section');
     const recommendedPrice = document.getElementById('recommended-price');
     const reasoningText = document.getElementById('reasoning-text');
-    const confidencePercent = document.getElementById('confidence-percent');
-    const confidenceFill = document.getElementById('confidence-fill');
     const analysisTime = document.getElementById('analysis-time');
 
     recommendedPrice.textContent = suggestedPrice;
     reasoningText.innerHTML = reasoning;
 
     const competitorCount = parseInt(document.getElementById('competitor-number').textContent);
-    let confidence = competitorCount <= 2 ? 45 : 75;
-
-    confidencePercent.textContent = `${confidence}%`;
-    confidenceFill.style.width = `${confidence}%`;
 
     analysisTime.textContent = 'just now';
 
