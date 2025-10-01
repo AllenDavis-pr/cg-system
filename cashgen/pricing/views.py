@@ -106,26 +106,6 @@ def split_reasoning_and_price(ai_response: str):
     return ai_response.strip(), "N/A"
 
 
-def individual_item_analyser_view(request):
-    # Handle prefilled data from URL parameters
-    prefilled_data = get_prefilled_data(request)
-    
-    if request.method == "POST" and request.headers.get("Content-Type") == "application/json":
-        return handle_item_analysis_request(request)
-    
-    # GET (render page)
-    return render(request, "individual_item_analyser.html", {"prefilled_data": prefilled_data})
-
-
-def item_buying_analyser_view(request):
-    # Handle prefilled data from URL parameters
-    prefilled_data = get_prefilled_data(request)
-    
-    if request.method == "POST" and request.headers.get("Content-Type") == "application/json":
-        return handle_item_analysis_request(request)
-    
-    # GET (render page)
-    return render(request, "item_buying_analyser.html", {"prefilled_data": prefilled_data})
 
 
 def get_prefilled_data(request):
@@ -264,18 +244,6 @@ def calculate_competitor_count(competitor_data):
 def calculate_confidence(competitor_count):
     """Calculate confidence score based on competitor count"""
     return min(100, competitor_count * 15)
-
-
-def inventory_free_stock_view(request):
-    inventory_items = (
-        InventoryItem.objects
-        .filter(status="free_stock")
-        .select_related("agreement", "market_item")
-        .prefetch_related(
-            Prefetch("market_item__listings")
-        )
-    )
-    return render(request, "inventory_free_stock.html", {"inventory_items": inventory_items})
 
 
 @require_GET
@@ -647,8 +615,7 @@ def scan_barcodes(request):
         return JsonResponse({"success": False, "error": str(e)}, status=500)
 
 
-def individual_item_analysis_view(request):
-    return render(request, "individual_item_analysis.html")
+
 
 @require_GET
 def price_analysis_detail(request, analysis_id):
@@ -671,6 +638,96 @@ def price_analysis_detail(request, analysis_id):
         "serial_number": analysis.item.serial_number,     # <-- add this
     })
 
+def individual_item_analysis_view(request):
+    return render(request, "individual_item_analysis.html")
 
 def home_view(request):
     return render(request, "home.html")
+
+
+def individual_item_analyser_view(request):
+    # Handle prefilled data from URL parameters
+    prefilled_data = get_prefilled_data(request)
+    
+    if request.method == "POST" and request.headers.get("Content-Type") == "application/json":
+        return handle_item_analysis_request(request)
+    
+    # GET (render page)
+    return render(request, "individual_item_analyser.html", {"prefilled_data": prefilled_data})
+
+
+def item_buying_analyser_view(request):
+    # Handle prefilled data from URL parameters
+    prefilled_data = get_prefilled_data(request)
+    
+    if request.method == "POST" and request.headers.get("Content-Type") == "application/json":
+        return handle_item_analysis_request(request)
+    
+    # GET (render page)
+    return render(request, "item_buying_analyser.html", {"prefilled_data": prefilled_data})
+
+def inventory_free_stock_view(request):
+    inventory_items = (
+        InventoryItem.objects
+        .filter(status="free_stock")
+        .select_related("agreement", "market_item")
+        .prefetch_related(
+            Prefetch("market_item__listings")
+        )
+    )
+    return render(request, "inventory_free_stock.html", {"inventory_items": inventory_items})
+    
+
+@csrf_exempt
+@require_POST
+def detect_irrelevant_competitors(request):
+    """
+    Accepts a search query and a list of competitor listings, 
+    returns indices of irrelevant listings.
+    """
+    try:
+        data = json.loads(request.body)
+        search_query = (data.get("search_query") or "").strip()
+        competitor_list = data.get("competitor_list") or []  # list of strings
+
+        if not search_query or not competitor_list:
+            return JsonResponse({"success": False, "error": "Missing search_query or competitor_list"}, status=400)
+
+        # Build prompt for Gemini
+        prompt_lines = [
+            f"You are filtering competitor listings for relevance.",
+            f"The user searched for: \"{search_query}\"",
+            "Here is the list of competitor listings with indices:"
+        ]
+        for idx, title in enumerate(competitor_list):
+            prompt_lines.append(f"{idx}: {title}")
+
+        prompt_lines.append(
+            "Task: Identify which indices are NOT relevant to the search query.\n"
+            "- Relevant means: it is the same product or a directly valid variation of the product searched.\n"
+            "- Irrelevant means: wrong model, accessories, games, unrelated items.\n"
+            "- Do not include any reasoning, only the indices.\n"
+            "- Respond ONLY with a JSON array of numbers."
+        )
+
+        prompt = "\n".join(prompt_lines)
+
+        # Call Gemini
+        ai_response = call_gemini_sync(prompt)
+
+        # Attempt to parse JSON array from AI response
+        try:
+            irrelevant_indices = json.loads(ai_response)
+            if not isinstance(irrelevant_indices, list):
+                irrelevant_indices = []
+        except Exception:
+            irrelevant_indices = []
+
+        return JsonResponse({
+            "success": True,
+            "irrelevant_indices": irrelevant_indices,
+            "raw_ai_response": ai_response
+        })
+
+    except Exception as e:
+        return JsonResponse({"success": False, "error": str(e)}, status=500)

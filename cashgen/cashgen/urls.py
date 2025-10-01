@@ -19,4 +19,5 @@ urlpatterns = [
     path('bulk-analyse-items/', v.bulk_analyse_items, name='bulk_analyse_items'),
     path("api/price-analysis/<int:analysis_id>/", v.price_analysis_detail, name="price_analysis_detail"),
     path('scrape-nospos/', v.scrape_nospos_view, name='scrape_nospos_view'),
+    path('detect_irrelevant_competitors/', v.detect_irrelevant_competitors, name='detect_irrelevant_competitors'),
 ]

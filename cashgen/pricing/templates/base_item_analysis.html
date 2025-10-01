@@ -368,6 +368,7 @@
           <th>ITEM</th>
           <th>PRICE</th>
           <th>STORE</th>
+          <th>RELEVANT?</th>
         </tr>
       </thead>
       <tbody id="competitor-tbody">
@@ -479,6 +480,7 @@ function updateCompetitorData(competitorData, competitorCount) {
                 <td><a href="${url}" target="_blank" rel="noopener noreferrer">${listingTitle}</a></td>
                 <td>${price}</td>
                 <td>${storeName}</td>
+                <td>Yes</td>
             `;
             allCompetitorRows.push(row);
         }
@@ -501,7 +503,13 @@ function updateCompetitorData(competitorData, competitorCount) {
         }
     }
 
+    const itemName = document.getElementById('item-name');
     applySortAndFilter();
+
+     // Trigger AI check automatically after table is ready
+    if (competitorCount > 0) {
+          checkIrrelevantCompetitors(itemName.value); // <-- supply the current search query
+    }
 }
 
 function applySortAndFilter() {
@@ -556,6 +564,57 @@ function applySortAndFilter() {
 
 document.getElementById('sort-price').addEventListener('change', applySortAndFilter);
 document.getElementById('filter-source').addEventListener('change', applySortAndFilter);
+
+async function checkIrrelevantCompetitors(searchQuery) {
+    const tbody = document.getElementById('competitor-tbody');
+    const rows = [...tbody.querySelectorAll('tr')];
+
+    console.log("tbody:", tbody);
+    console.log("all rows:", rows);
+    rows.forEach((row, i) => {
+        console.log(i, row.cells.length, row.innerHTML);
+    });
+
+    // Extract competitor titles from the table
+    const competitorList = rows
+        .filter(row => row.cells.length >= 2)  // skip empty rows
+        .map(row => row.cells[1].textContent.trim());
+
+
+    if (!competitorList.length) {
+        console.log("No competitor listings found in table.");
+        return;
+    }
+
+    // Send POST to your new backend view
+    try {
+        const response = await fetch("/detect_irrelevant_competitors/", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                search_query: searchQuery,
+                competitor_list: competitorList
+            })
+        });
+
+        const result = await response.json();
+        console.log("AI Output:", result.raw_ai_response);
+        const irrelevantIndices = result.irrelevant_indices;
+
+        rows.forEach((row, i) => {
+            if (row.cells.length >= 5) { // make sure the RELEVANT? column exists
+                const isRelevant = !irrelevantIndices.includes(i);
+                row.cells[4].textContent = isRelevant ? "Yes" : "No";
+
+                row.style.opacity = isRelevant ? "1" : "0.5";
+            }
+        });
+
+    } catch (err) {
+        console.error("Error calling AI endpoint:", err);
+    }
+}
+
 
 {% block extra_script %}{% endblock %}
 
