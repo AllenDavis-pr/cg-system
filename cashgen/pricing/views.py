@@ -306,6 +306,7 @@ def link_inventory_to_marketitem(request):
         import traceback; traceback.print_exc()
         return JsonResponse({'success': False, 'error': str(e)}, status=500)
 
+
 @require_POST
 @csrf_exempt
 def unlink_inventory_from_marketitem(request):
@@ -575,6 +576,7 @@ def bulk_analyse_items(request):
         traceback.print_exc()
         return JsonResponse({"success": False, "error": str(e)}, status=500)
 
+
 from automation.scrape_nospos import scrape_barcodes
 import asyncio
 @csrf_exempt
@@ -615,8 +617,6 @@ def scan_barcodes(request):
         return JsonResponse({"success": False, "error": str(e)}, status=500)
 
 
-
-
 @require_GET
 def price_analysis_detail(request, analysis_id):
     analysis = get_object_or_404(PriceAnalysis.objects.select_related("item"), pk=analysis_id)
@@ -640,6 +640,7 @@ def price_analysis_detail(request, analysis_id):
 
 def individual_item_analysis_view(request):
     return render(request, "individual_item_analysis.html")
+
 
 def home_view(request):
     return render(request, "home.html")
@@ -665,6 +666,7 @@ def item_buying_analyser_view(request):
     
     # GET (render page)
     return render(request, "item_buying_analyser.html", {"prefilled_data": prefilled_data})
+
 
 def inventory_free_stock_view(request):
     inventory_items = (
@@ -720,9 +722,6 @@ def detect_irrelevant_competitors(request):
 
         # Call Gemini
         ai_response = call_gemini_sync(prompt)
-        print(prompt)
-
-        print(ai_response)
 
         # Attempt to parse JSON array from AI response
         try:

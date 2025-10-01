@@ -24,6 +24,9 @@ async def main():
 
         try:
             page = await browser.new_page()
+            await page.set_extra_http_headers({
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+            })
 
             print(f"Starting automation for item: {args.item_name}", flush=True)
             print(f"Description: {args.description}", flush=True)
@@ -42,6 +45,26 @@ async def main():
 
             print("[OK] New Product page opened.", flush=True)
 
+            # Toggle switch OFF
+            await page.wait_for_selector("#normal-switch")
+            await page.evaluate("""
+            () => {
+                const handle = document.querySelector('#normal-switch');
+                const bg = handle.parentElement.querySelector('.react-switch-bg');
+                const checkIcon = bg.children[0];
+                const crossIcon = bg.children[1];
+
+                if (handle.getAttribute('aria-checked') === 'true') {
+                    handle.setAttribute('aria-checked', 'false');
+                    handle.style.transform = 'translateX(0px)';
+                    bg.style.background = '#ccc';
+                    checkIcon.style.opacity = '0';
+                    crossIcon.style.opacity = '1';
+                }
+            }
+            """)
+
+
             # Fill Product Name
             await page.fill("#title", args.item_name)
 
@@ -57,13 +80,39 @@ async def main():
             else:
                 print(f"[WARN] Skipping price field, invalid value: {args.price}", flush=True)
 
-            # Fill barcode with serial number
             if args.serial_number:
                 await page.fill("#barcode", args.serial_number)
+                print("[OK] Barcode entered and grade set to B.", flush=True)
 
-            print(args.serial_number)
+
+            await page.select_option("#fulfilmentOption", "anyfulfilment")
+            await page.select_option("#condition", "used")
+
+            await page.wait_for_selector("#grade", state="visible")
+            await page.select_option("#grade", "B")
+
+            print("[OK] Fulfilment method and condition set.", flush=True)
+
 
             print("[OK] Form fields filled.", flush=True)
+
+           # Wait for the Save Product button to appear
+            await page.wait_for_selector("button:has-text('Save Product')")
+
+            await page.evaluate("""
+            () => {
+                const buttons = Array.from(document.querySelectorAll('button.btn'));
+                const saveButton = buttons.find(b => b.textContent.trim() === 'Save Product');
+                if (saveButton) saveButton.scrollIntoView({block: 'center', inline: 'center'});
+            }
+            """)
+
+            await asyncio.sleep(10)
+
+            # Click the button
+            await page.click("button:has-text('Save Product')", force=True)
+
+            print("[OK] Clicked Save button with force click (fallback).", flush=True)
 
             # Wait for the user to close the browser
             print("[INFO] Browser is open. Please close it manually to continue...", flush=True)
