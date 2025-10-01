@@ -676,7 +676,7 @@ def inventory_free_stock_view(request):
         )
     )
     return render(request, "inventory_free_stock.html", {"inventory_items": inventory_items})
-    
+
 
 @csrf_exempt
 @require_POST
@@ -689,24 +689,30 @@ def detect_irrelevant_competitors(request):
         data = json.loads(request.body)
         search_query = (data.get("search_query") or "").strip()
         competitor_list = data.get("competitor_list") or []  # list of strings
+        item_description = (data.get("item_description") or "").strip()
 
         if not search_query or not competitor_list:
             return JsonResponse({"success": False, "error": "Missing search_query or competitor_list"}, status=400)
 
         # Build prompt for Gemini
         prompt_lines = [
-            f"You are filtering competitor listings for relevance.",
+            "You are filtering competitor listings for relevance.",
             f"The user searched for: \"{search_query}\"",
-            "Here is the list of competitor listings with indices:"
         ]
+
+        if item_description:
+            prompt_lines.append(f"Item description: \"{item_description}\"")
+
+        prompt_lines.append("Here is the list of competitor listings with indices:")
         for idx, title in enumerate(competitor_list):
             prompt_lines.append(f"{idx}: {title}")
 
         prompt_lines.append(
-            "Task: Identify which indices are NOT relevant to the search query.\n"
+            "Task: Identify which indices are NOT relevant to the search query and description.\n"
             "- Relevant means: it is the same product or a directly valid variation of the product searched.\n"
             "- Irrelevant means: wrong model, accessories, games, unrelated items.\n"
             "- Do not include any reasoning, only the indices.\n"
+            "- IMPORTANT: Ignore the description for judging relevance unless it contains clear model or variant information. Focus primarily on product title matching."
             "- Respond ONLY with a JSON array of numbers."
         )
 
@@ -714,6 +720,9 @@ def detect_irrelevant_competitors(request):
 
         # Call Gemini
         ai_response = call_gemini_sync(prompt)
+        print(prompt)
+
+        print(ai_response)
 
         # Attempt to parse JSON array from AI response
         try:

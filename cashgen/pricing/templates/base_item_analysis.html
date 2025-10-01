@@ -579,12 +579,19 @@ async function checkIrrelevantCompetitors(searchQuery) {
     const competitorList = rows
         .filter(row => row.cells.length >= 2)  // skip empty rows
         .map(row => row.cells[1].textContent.trim());
-
+        
 
     if (!competitorList.length) {
         console.log("No competitor listings found in table.");
         return;
     }
+
+    
+    // Grab the item description
+    const itemDescription = document.getElementById('description') 
+        ? document.getElementById('description').value.trim() 
+        : "";
+
 
     // Send POST to your new backend view
     try {
@@ -593,6 +600,7 @@ async function checkIrrelevantCompetitors(searchQuery) {
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
                 search_query: searchQuery,
+                item_description: itemDescription,
                 competitor_list: competitorList
             })
         });
