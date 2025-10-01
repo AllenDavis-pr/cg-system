@@ -202,7 +202,7 @@ function calculateBuyingRange(sellingPrice, marginPercent) {
     };
 }
 
-function displayAnalysis(reasoning, suggestedPrice) {
+function displayAnalysis(reasoning, suggestedPrice, buyingRange) {
     const analysisResults = document.getElementById('analysis-results');
     const recommendedPrice = document.getElementById('recommended-price');
     const recommendedPriceDisplay = document.getElementById('recommended-price-display');
@@ -223,15 +223,14 @@ function displayAnalysis(reasoning, suggestedPrice) {
     if (reasoningText) reasoningText.innerHTML = reasoning;
     if (reasoningTextContent) reasoningTextContent.innerHTML = reasoning;
 
-    // Calculate buying range based on minimum margin
-    const marginPercent = document.getElementById('minimum-margin').value || 37.5;
-    const buyingRange = calculateBuyingRange(suggestedPrice, marginPercent);
-    
-    buyingPriceMin.textContent = buyingRange.min;
-    buyingPriceMax.textContent = buyingRange.max;
-
     const competitorNumber = document.getElementById('competitor-number');
     const competitorCount = competitorNumber ? parseInt(competitorNumber.textContent) : 0;
+
+    // use AI’s values directly
+    if (buyingRange) {
+        buyingPriceMin.textContent = buyingRange.min;
+        buyingPriceMax.textContent = buyingRange.max;
+    }
 
     analysisTime.textContent = 'just now';
 
@@ -308,7 +307,22 @@ async function analyzeItem() {
             const buyingData = await buyingResponse.json();
             console.log("Buying range AI response:", buyingData);
 
-            displayAnalysis(data.reasoning, data.suggested_price);
+            let minPrice = "£0.00";
+            let maxPrice = "£0.00";
+
+            if (buyingData.success && buyingData.ai_response) {
+                // Example AI output: "FINAL:35%-45%"
+                const match = buyingData.ai_response.match(/FINAL:(\d+)%\s*[-–]\s*(\d+)%/i);
+                if (match) {
+                    const minPct = parseFloat(match[1]);
+                    const maxPct = parseFloat(match[2]);
+                    const basePrice = parseFloat(data.suggested_price.replace(/[^0-9.]/g, ''));
+                    minPrice = `£${(basePrice * (minPct / 100)).toFixed(2)}`;
+                    maxPrice = `£${(basePrice * (maxPct / 100)).toFixed(2)}`;
+                }
+            }
+
+            displayAnalysis(data.reasoning, data.suggested_price, { min: minPrice, max: maxPrice });
         } else {
             alert(`Error: ${data.error}`);
         }
