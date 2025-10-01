@@ -536,20 +536,38 @@ function applySortAndFilter() {
     const sortValue = document.getElementById('sort-price').value;
     const filterValue = document.getElementById('filter-source').value.toLowerCase();
 
+    // 1️⃣ Filtering
     rows = rows.filter(row => {
         if (row.cells[0].colSpan === 4) return false;
         const source = row.cells[0].textContent.trim().toLowerCase();
         return filterValue === 'all' || source === filterValue;
     });
 
+    // 2️⃣ Sorting
     if (sortValue !== 'none') {
+        // price sort
         rows.sort((a, b) => {
-            const priceA = parseFloat(a.cells[2].textContent.replace(/[^0-9.-]+/g, ""));
-            const priceB = parseFloat(b.cells[2].textContent.replace(/[^0-9.-]+/g, ""));
+            const priceA = parseFloat(a.cells[2].textContent.replace(/[^0-9.-]+/g, "")) || 0;
+            const priceB = parseFloat(b.cells[2].textContent.replace(/[^0-9.-]+/g, "")) || 0;
             return sortValue === 'asc' ? priceA - priceB : priceB - priceA;
+        });
+    } else if (filterValue === 'all') {
+        // ✅ Custom default ordering
+        const sourceOrder = {
+            "cashgenerator": 1,  // cg
+            "cex": 2,
+            "cashconverters": 3, // cc
+            "ebay": 4
+        };
+
+        rows.sort((a, b) => {
+            const sourceA = a.cells[0].textContent.trim().toLowerCase();
+            const sourceB = b.cells[0].textContent.trim().toLowerCase();
+            return (sourceOrder[sourceA] || 99) - (sourceOrder[sourceB] || 99);
         });
     }
 
+    // 3️⃣ Render
     tbody.innerHTML = '';
     if (rows.length === 0) {
         tbody.innerHTML = '<tr><td colspan="4" style="text-align: center; color: #666666; font-style: italic;">No competitor data matches filter</td></tr>';
@@ -559,6 +577,7 @@ function applySortAndFilter() {
 
     document.getElementById('competitor-number').textContent = rows.length;
 }
+
 
 document.getElementById('sort-price').addEventListener('change', applySortAndFilter);
 document.getElementById('filter-source').addEventListener('change', applySortAndFilter);
