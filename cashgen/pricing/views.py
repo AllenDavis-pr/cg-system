@@ -6,7 +6,7 @@ from django.utils import timezone
 
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST, require_GET
-from pricing.models import InventoryItem, MarketItem, CompetitorListing, PriceAnalysis, Category, MarginRule
+from pricing.models import InventoryItem, MarketItem, CompetitorListing, PriceAnalysis, Category, MarginRule, GlobalMarginRule
 from datetime import datetime
 
 import google.generativeai as genai
@@ -58,6 +58,7 @@ def build_price_analysis_prompt(
         "Do not split your reasoning into sections. Have it as one paragraph."
         "ALWAYS quote competitor data (with the competitor name, store location) to justify reasoning. "
         "Prioritise CashGenerator listings over other listings. "
+        "Please ignore data from stores which have no listings that match the exact model and do not mention them in your reasonings."
         "Consider the desirability of the item (how much people want it) and the "
         "sellability of the item (how easy it is to sell to a general population). "
         "For example, the newest Mac laptop is very desirable, but due to its price, not very "
@@ -656,11 +657,16 @@ def individual_item_analyser_view(request):
     # GET (render page)
     return render(request, "individual_item_analyser.html", {"prefilled_data": prefilled_data})
 
-from .forms import CategoryForm, MarginRuleForm
+from .forms import CategoryForm, MarginRuleForm, GlobalMarginRuleForm
 
 def category_list(request):
     categories = Category.objects.all()
-    return render(request, "categories.html", {"categories": categories})
+    global_rules = GlobalMarginRule.objects.all()
+    return render(request, "categories.html", {
+        "categories": categories,
+        "global_rules": global_rules,
+    })
+
 
 def category_detail(request, pk):
     category = get_object_or_404(Category, pk=pk)
@@ -764,6 +770,49 @@ def delete_rule(request, pk):
 
     # Optional confirmation page
     return render(request, "delete_rule_confirm.html", {"rule": rule, "category": category})
+
+
+def add_global_rule(request):
+    if request.method == "POST":
+        form = GlobalMarginRuleForm(request.POST)
+        if form.is_valid():
+            form.save()
+            return redirect("category_list")
+    else:
+        form = GlobalMarginRuleForm()
+
+    return render(request, "add_edit_global_rule.html", {
+        "form": form,
+        "is_edit": False,
+    })
+
+
+def edit_global_rule(request, pk):
+    rule = get_object_or_404(GlobalMarginRule, pk=pk)
+
+    if request.method == "POST":
+        form = GlobalMarginRuleForm(request.POST, instance=rule)
+        if form.is_valid():
+            form.save()
+            return redirect("category_list")
+    else:
+        form = GlobalMarginRuleForm(instance=rule)
+
+    return render(request, "add_edit_global_rule.html", {
+        "form": form,
+        "is_edit": True,
+    })
+
+
+def delete_global_rule(request, pk):
+    rule = get_object_or_404(GlobalMarginRule, pk=pk)
+
+    if request.method == "POST":
+        rule.delete()
+        return redirect("category_list")
+
+    return render(request, "delete_global_rule_confirm.html", {"rule": rule})
+
 
 
 def item_buying_analyser_view(request):

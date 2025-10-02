@@ -28,4 +28,42 @@
     {% endfor %}
   </tbody>
 </table>
+
+
+<!-- Global Rules Section -->
+<h2 style="margin: 32px 0 16px 0;">Global Margin Rules</h2>
+
+<table>
+  <thead>
+    <tr>
+      <th>TYPE</th>
+      <th>MATCH VALUE</th>
+      <th>ADJUSTMENT</th>
+      <th>ACTIVE</th>
+      <th>ACTIONS</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for rule in global_rules %}
+    <tr>
+      <td>{{ rule.get_rule_type_display }}</td>
+      <td>{{ rule.match_value }}</td>
+      <td>{% if rule.adjustment >= 0 %}+{% endif %}{{ rule.adjustment|floatformat:3 }}</td>
+      <td>{% if rule.is_active %}Yes{% else %}No{% endif %}</td>
+      <td>
+        <a href="{% url 'edit_global_rule' rule.id %}" class="btn">✎</a>
+        <a href="{% url 'delete_global_rule' rule.id %}" class="btn" style="background:#660000">X</a>
+      </td>
+    </tr>
+    {% empty %}
+    <tr>
+      <td colspan="5" style="text-align:center; color:#777;">No global rules yet.</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+<div style="margin-top:16px;">
+  <a href="{% url 'add_global_rule' %}" class="btn">+ Add Global Rule</a>
+</div>
 {% endblock %}

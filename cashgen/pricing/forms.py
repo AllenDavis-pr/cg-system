@@ -1,5 +1,5 @@
 from django import forms
-from .models import Category, MarginRule
+from .models import Category, MarginRule, GlobalMarginRule
 
 class CategoryForm(forms.ModelForm):
     class Meta:
@@ -21,3 +21,8 @@ class MarginRuleForm(forms.ModelForm):
             "adjustment": forms.NumberInput(attrs={"step": "0.01"}),
             "is_active": forms.CheckboxInput(),
         }
+
+class GlobalMarginRuleForm(forms.ModelForm):
+    class Meta:
+        model = GlobalMarginRule
+        fields = ["rule_type", "match_value", "adjustment", "description", "order", "is_active"]

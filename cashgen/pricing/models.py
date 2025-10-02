@@ -157,7 +157,6 @@ class MarginRule(models.Model):
         ('manufacturer', 'Manufacturer'),
         ('model', 'Model'),
         ('condition', 'Condition'),
-        ('demand', 'Demand'),
         ('feature', 'Feature'),
     ]
 
@@ -175,3 +174,27 @@ class MarginRule(models.Model):
     def __str__(self):
         sign = '+' if self.adjustment >= 0 else ''
         return f"{self.category.name} - {self.rule_type}: {self.match_value} ({sign}{self.adjustment * 100:.1f}%)"
+
+
+class GlobalMarginRule(models.Model):
+    RULE_TYPES = [
+        ('condition', 'Condition'),
+        ('demand', 'Demand'),
+    ]
+
+    rule_type = models.CharField(max_length=20, choices=RULE_TYPES)
+    match_value = models.CharField(max_length=100)
+    adjustment = models.FloatField(help_text="e.g. 0.10 for +10%, -0.05 for -5%")
+    description = models.CharField(max_length=200, blank=True)
+    order = models.IntegerField(default=0, help_text="Rules with lower order run first")
+    is_active = models.BooleanField(default=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['order', 'rule_type']
+
+    def __str__(self):
+        sign = '+' if self.adjustment >= 0 else ''
+        return f"Global {self.rule_type}: {self.match_value} ({sign}{self.adjustment * 100:.1f}%)"

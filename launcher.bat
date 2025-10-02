@@ -39,3 +39,4 @@ REM -----------------------------
 python\cgpython.exe desktop_launcher.py
 
 endlocal
+pause

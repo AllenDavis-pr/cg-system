@@ -17,6 +17,11 @@ urlpatterns = [
     path("categories/<int:pk>/delete/", v.delete_category, name="delete_category"),
     path("categories/<int:pk>/manage/", v.manage_category, name="manage_category"),
 
+    path("global-rules/add/", v.add_global_rule, name="add_global_rule"),
+    path("global-rules/<int:pk>/edit/", v.edit_global_rule, name="edit_global_rule"),
+    path("global-rules/<int:pk>/delete/", v.delete_global_rule, name="delete_global_rule"),
+
+
     path("rules/add/<int:category_pk>/", v.add_rule, name="add_rule"),
     path("rules/<int:pk>/edit/", v.edit_rule, name="edit_rule"),
     path("rules/<int:pk>/delete/", v.delete_rule, name="delete_rule"),
