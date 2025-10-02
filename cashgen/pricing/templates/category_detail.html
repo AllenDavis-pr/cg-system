@@ -7,7 +7,7 @@
     <h2>{{ category.name }} (Base Margin: {{ category.base_margin|floatformat:2 }})</h2>
     <div>
         <a href="{% url 'edit_category' category.id %}" class="btn">[Edit]</a>
-        <a href="{% url 'delete_category' category.id %}" class="btn" style="background:#660000">[X]</a>
+        <a href="{% url 'delete_category' category.id %}" class="btn-delete" style="background:#660000">[X]</a>
     </div>
 </div>
 
@@ -32,7 +32,7 @@
             <td>{% if rule.is_active %}Yes{% else %}No{% endif %}</td>
             <td>
                 <a href="{% url 'edit_rule' rule.id %}" class="btn">✎</a>
-                <a href="{% url 'delete_rule' rule.id %}" class="btn" style="background:#660000">X</a>
+                <a href="{% url 'delete_rule' rule.id %}" class="btn-delete" style="background:#660000">X</a>
             </td>
         </tr>
         {% empty %}
