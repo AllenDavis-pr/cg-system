@@ -6,7 +6,7 @@ from django.utils import timezone
 
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST, require_GET
-from pricing.models import InventoryItem, MarketItem, CompetitorListing, PriceAnalysis, Category
+from pricing.models import InventoryItem, MarketItem, CompetitorListing, PriceAnalysis, Category, MarginRule
 from datetime import datetime
 
 import google.generativeai as genai
@@ -656,11 +656,21 @@ def individual_item_analyser_view(request):
     # GET (render page)
     return render(request, "individual_item_analyser.html", {"prefilled_data": prefilled_data})
 
-from .forms import CategoryForm
+from .forms import CategoryForm, MarginRuleForm
 
 def category_list(request):
     categories = Category.objects.all()
     return render(request, "categories.html", {"categories": categories})
+
+def category_detail(request, pk):
+    category = get_object_or_404(Category, pk=pk)
+    rules = category.rules.all()  # MarginRules related to this category
+
+    return render(request, "category_detail.html", {
+        "category": category,
+        "rules": rules,
+    })
+
 
 def add_category(request):
     if request.method == "POST":
@@ -672,10 +682,88 @@ def add_category(request):
         form = CategoryForm()
     return render(request, "add_category.html", {"form": form})
 
+def edit_category(request, pk):
+    category = get_object_or_404(Category, pk=pk)
+
+    if request.method == "POST":
+        form = CategoryForm(request.POST, instance=category)
+        if form.is_valid():
+            form.save()
+            return redirect("category_detail", pk=category.pk)
+    else:
+        form = CategoryForm(instance=category)
+
+    return render(request, "add_category.html", {
+        "form": form,
+        "category": category,
+        "is_edit": True,  # optional flag for template
+    })
+
 def manage_category(request, pk):
     category = get_object_or_404(Category, pk=pk)
     # Here you could list/edit rules later
     return render(request, "manage_category.html", {"category": category})
+
+
+def delete_category(request, pk):
+    category = get_object_or_404(Category, pk=pk)
+
+    if request.method == "POST":
+        category.delete()
+        return redirect("category_list")  # Redirect to the category list page
+
+    # Optional: show a confirmation page
+    return render(request, "delete_category_confirm.html", {"category": category})
+
+
+def add_rule(request, category_pk):
+    category = get_object_or_404(Category, pk=category_pk)
+
+    if request.method == "POST":
+        form = MarginRuleForm(request.POST)
+        if form.is_valid():
+            rule = form.save(commit=False)
+            rule.category = category  # link rule to this category
+            rule.save()
+            return redirect("category_detail", pk=category.pk)
+    else:
+        form = MarginRuleForm()
+
+    return render(request, "add_edit_rule.html", {
+        "form": form,
+        "category": category,
+        "is_edit": False,
+    })
+
+def edit_rule(request, pk):
+    rule = get_object_or_404(MarginRule, pk=pk)
+    category = rule.category
+
+    if request.method == "POST":
+        form = MarginRuleForm(request.POST, instance=rule)
+        if form.is_valid():
+            form.save()
+            return redirect("category_detail", pk=category.pk)
+    else:
+        form = MarginRuleForm(instance=rule)
+
+    return render(request, "add_edit_rule.html", {
+        "form": form,
+        "category": category,
+        "is_edit": True,
+    })
+
+
+def delete_rule(request, pk):
+    rule = get_object_or_404(MarginRule, pk=pk)
+    category = rule.category
+
+    if request.method == "POST":
+        rule.delete()
+        return redirect("category_detail", pk=category.pk)
+
+    # Optional confirmation page
+    return render(request, "delete_rule_confirm.html", {"rule": rule, "category": category})
 
 
 def item_buying_analyser_view(request):
@@ -686,7 +774,9 @@ def item_buying_analyser_view(request):
         return handle_item_analysis_request(request)
     
     # GET (render page)
-    return render(request, "item_buying_analyser.html", {"prefilled_data": prefilled_data})
+    return render(request, "item_buying_analyser.html", {"prefilled_data": prefilled_data}
+
+                  )
 
 
 def inventory_free_stock_view(request):

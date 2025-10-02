@@ -11,8 +11,15 @@ urlpatterns = [
     path('item-buying-analyser/', v.item_buying_analyser_view, name='item_buying_analyser'),
     path("inventory/free/", v.inventory_free_stock_view, name="inventory_free_stock"),
     path("categories/", v.category_list, name="category_list"),
-    path("categories/add/", v.add_category, name="add_category"),
-    path("categories/<int:pk>/", v.manage_category, name="manage_category"),
+    path("categories/add/", v.add_category, name="add_category"),  # ✅ must exist
+    path("categories/<int:pk>/", v.category_detail, name="category_detail"),
+    path("categories/<int:pk>/edit/", v.edit_category, name="edit_category"),
+    path("categories/<int:pk>/delete/", v.delete_category, name="delete_category"),
+    path("categories/<int:pk>/manage/", v.manage_category, name="manage_category"),
+
+    path("rules/add/<int:category_pk>/", v.add_rule, name="add_rule"),
+    path("rules/<int:pk>/edit/", v.edit_rule, name="edit_rule"),
+    path("rules/<int:pk>/delete/", v.delete_rule, name="delete_rule"),
 
     # ----------------------------- API -----------------------------
     path('marketitem_suggestions', v.marketitem_suggestions, name='marketitem_suggestions'),
