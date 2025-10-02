@@ -607,7 +607,7 @@ async function checkIrrelevantCompetitors(searchQuery) {
                 const isRelevant = !irrelevantIndices.includes(i);
                 row.cells[4].textContent = isRelevant ? "Yes" : "No";
 
-                row.style.opacity = isRelevant ? "1" : "0.5";
+                row.style.opacity = isRelevant ? "1" : "0.3";
             }
         });
 
