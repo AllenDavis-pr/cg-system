@@ -186,14 +186,11 @@ class GlobalMarginRule(models.Model):
     match_value = models.CharField(max_length=100)
     adjustment = models.FloatField(help_text="e.g. 0.10 for +10%, -0.05 for -5%")
     description = models.CharField(max_length=200, blank=True)
-    order = models.IntegerField(default=0, help_text="Rules with lower order run first")
     is_active = models.BooleanField(default=True)
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
-    class Meta:
-        ordering = ['order', 'rule_type']
 
     def __str__(self):
         sign = '+' if self.adjustment >= 0 else ''

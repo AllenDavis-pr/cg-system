@@ -778,6 +778,8 @@ def add_global_rule(request):
         if form.is_valid():
             form.save()
             return redirect("category_list")
+        else:
+            print(form.errors)
     else:
         form = GlobalMarginRuleForm()
 
@@ -812,7 +814,6 @@ def delete_global_rule(request, pk):
         return redirect("category_list")
 
     return render(request, "delete_global_rule_confirm.html", {"rule": rule})
-
 
 
 def item_buying_analyser_view(request):

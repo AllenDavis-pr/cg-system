@@ -25,4 +25,4 @@ class MarginRuleForm(forms.ModelForm):
 class GlobalMarginRuleForm(forms.ModelForm):
     class Meta:
         model = GlobalMarginRule
-        fields = ["rule_type", "match_value", "adjustment", "description", "order", "is_active"]
+        fields = ["rule_type", "match_value", "adjustment", "description", "is_active"]
