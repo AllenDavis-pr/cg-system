@@ -33,6 +33,18 @@
 
 {% block extra_style %}
 {{ block.super }}
+
+.analysis-scroll-container {
+  max-height: 300px; /* Adjust this height as needed */
+  min-height: 150px;
+  overflow-y: auto;
+  resize: vertical; /* Allow user to resize */
+  border: 1px solid #333;
+  border-radius: 8px;
+  padding: 20px;
+  background-color: #0a0a0a;
+}
+
 .price-panels-container {
   display: flex;
   gap: 20px;
@@ -105,12 +117,37 @@
   align-self: stretch;
 }
 
+.reasoning-panels-container {
+  display: flex;
+  gap: 0;
+  align-items: stretch;
+  margin-bottom: 0; /* Remove bottom margin since it's inside scroll container */
+}
+
 .reasoning-panel {
+  flex: 1;
   background-color: #111111;
   border: 1px solid #333;
   border-radius: 8px;
   padding: 20px;
-  margin-bottom: 20px;
+}
+
+.reasoning-panels-container .reasoning-panel:first-child {
+  border-right: none;
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+}
+
+.reasoning-panels-container .reasoning-panel:last-child {
+  border-left: none;
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+}
+
+.reasoning-separator {
+  width: 1px;
+  background-color: #333;
+  align-self: stretch;
 }
 
 .reasoning-panel-label {
@@ -126,6 +163,8 @@
   line-height: 1.6;
   font-size: 14px;
 }
+
+
 
 /* Hide the entire analysis section by default */
 .analysis-results {
@@ -146,36 +185,47 @@
 
 {% block buying_price_panel %}
 <div class="analysis-results" id="analysis-results">
-  <div class="price-panels-container">
-    <div class="price-panel">
-      <div class="price-panel-label">Recommended Selling Price</div>
-      <div class="price-panel-value" id="recommended-price-display">£0.00</div>
-    </div>
+  <div class="analysis-scroll-container">
+    <div class="price-panels-container">
+      <div class="price-panel">
+        <div class="price-panel-label">Recommended Selling Price</div>
+        <div class="price-panel-value" id="recommended-price-display">£0.00</div>
+      </div>
 
-    <div class="price-separator"></div>
+      <div class="price-panel">
+        <div class="price-panel-label">Recommended Buying Range</div>
+        <div class="buying-range-display">
+            <div class="buying-price-item">
+                <div class="buying-price-value" id="buying-price-min">£0.00</div>
+                <div class="buying-price-sublabel">Min</div>
+            </div>
 
-    <div class="price-panel">
-      <div class="price-panel-label">Recommended Buying Range</div>
-      <div class="buying-range-display">
-          <div class="buying-price-item">
-              <div class="buying-price-value" id="buying-price-min">£0.00</div>
-              <div class="buying-price-sublabel">Min</div>
-          </div>
+            <div class="buying-price-separator">—</div>
 
-          <div class="buying-price-separator">—</div>
-
-          <div class="buying-price-item">
-              <div class="buying-price-value" id="buying-price-max">£0.00</div>
-              <div class="buying-price-sublabel">Max</div>
-          </div>
+            <div class="buying-price-item">
+                <div class="buying-price-value" id="buying-price-max">£0.00</div>
+                <div class="buying-price-sublabel">Max</div>
+            </div>
+        </div>
       </div>
     </div>
-  </div>
 
-  <div class="reasoning-panel">
-    <div class="reasoning-panel-label">Reasoning</div>
-    <div class="reasoning-panel-text" id="reasoning-text-content">
-      Analysis will appear here...
+    <div class="reasoning-panels-container">
+      <div class="reasoning-panel">
+        <div class="reasoning-panel-label">Reasoning - Selling Price</div>
+        <div class="reasoning-panel-text" id="reasoning-text-content">
+          Analysis will appear here...
+        </div>
+      </div>
+
+      <div class="reasoning-separator"></div>
+
+      <div class="reasoning-panel">
+        <div class="reasoning-panel-label">Reasoning - Buying Price</div>
+        <div class="reasoning-panel-text" id="reasoning-buying-text">
+          Buying analysis will appear here...
+        </div>
+      </div>
     </div>
   </div>
 </div>
@@ -202,13 +252,15 @@ function calculateBuyingRange(sellingPrice, marginPercent) {
     };
 }
 
-function displayAnalysis(reasoning, suggestedPrice, buyingRange) {
+function displayAnalysis(reasoning, suggestedPrice, buyingRange, buyingReasoning) {
     const analysisResults = document.getElementById('analysis-results');
     const recommendedPrice = document.getElementById('recommended-price');
     const recommendedPriceDisplay = document.getElementById('recommended-price-display');
     const buyingPriceMin = document.getElementById('buying-price-min');
     const buyingPriceMax = document.getElementById('buying-price-max');
     const reasoningText = document.getElementById('reasoning-text');
+    const buyingReasoningText = document.getElementById('reasoning-buying-text');
+
     const reasoningTextContent = document.getElementById('reasoning-text-content');
     const analysisTime = document.getElementById('analysis-time');
 
@@ -222,6 +274,7 @@ function displayAnalysis(reasoning, suggestedPrice, buyingRange) {
     // Update both reasoning displays
     if (reasoningText) reasoningText.innerHTML = reasoning;
     if (reasoningTextContent) reasoningTextContent.innerHTML = reasoning;
+    if (buyingReasoningText) buyingReasoningText.innerHTML = buyingReasoning
 
     const competitorNumber = document.getElementById('competitor-number');
     const competitorCount = competitorNumber ? parseInt(competitorNumber.textContent) : 0;
@@ -322,7 +375,7 @@ async function analyzeItem() {
                 }
             }
 
-            displayAnalysis(data.reasoning, data.suggested_price, { min: minPrice, max: maxPrice });
+            displayAnalysis(data.reasoning, data.suggested_price, { min: minPrice, max: maxPrice }, buyingData.ai_response);
         } else {
             alert(`Error: ${data.error}`);
         }

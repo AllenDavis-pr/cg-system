@@ -788,9 +788,9 @@ def buying_range_analysis(request):
             f"- Samsung Galaxy: {CURRENT_GEN_MODELS['Samsung Galaxy']}\n"
             f"- Google Pixel: {CURRENT_GEN_MODELS['Google Pixel']}\n"
             "\nUse this when deciding whether a device is 'current gen', '1–2 years old', etc.\n\n"
-            "DO NOT DEVIATE FROM THE MARGINS PROVIDED."
+            "You may deviate from the percentage provided depending on the item's desirability and sellability, but ONLY the higher end."
             "- OUTPUT FORMAT:"
-            "Reasoning: your reasoning (within 100 words)"
+            "your reasoning (within 100 words)"
             "FINAL:MIN%–MAX% (for example: FINAL:35%-45%).\n"
         )
 

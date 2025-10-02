@@ -601,6 +601,7 @@ async function checkIrrelevantCompetitors(searchQuery) {
 
         const result = await response.json();
         const irrelevantIndices = result.irrelevant_indices;
+        console.log(irrelevantIndices)
 
         rows.forEach((row, i) => {
             if (row.cells.length >= 5) { // make sure the RELEVANT? column exists
