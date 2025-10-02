@@ -10,6 +10,9 @@ urlpatterns = [
     path('individual-item-analyser/', v.individual_item_analyser_view, name='individual_item_analyser'),
     path('item-buying-analyser/', v.item_buying_analyser_view, name='item_buying_analyser'),
     path("inventory/free/", v.inventory_free_stock_view, name="inventory_free_stock"),
+    path("categories/", v.category_list, name="category_list"),
+    path("categories/add/", v.add_category, name="add_category"),
+    path("categories/<int:pk>/", v.manage_category, name="manage_category"),
 
     # ----------------------------- API -----------------------------
     path('marketitem_suggestions', v.marketitem_suggestions, name='marketitem_suggestions'),

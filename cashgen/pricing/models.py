@@ -38,11 +38,14 @@ class CompetitorListing(models.Model):
 # -------------------------------
 
 class Category(models.Model):
-    name = models.CharField(max_length=100)
-    attributes = models.JSONField(blank=True, null=True)  # flexible category-specific metadata
+    name = models.CharField(max_length=100, unique=True)
+    base_margin = models.FloatField(default=0.0)  # store margin directly here
+    description = models.TextField(blank=True)
+    attributes = models.JSONField(blank=True, null=True)  # optional metadata
 
     def __str__(self):
-        return self.name
+        return f"{self.name} ({self.base_margin * 100:.0f}%)"
+
 
 class PawnShopAgreement(models.Model):
     agreement_number = models.CharField(max_length=50, unique=True)
@@ -108,6 +111,7 @@ class PriceAnalysis(models.Model):
     def __str__(self):
         return f"Analysis for {self.item.title} - £{self.suggested_price}"
 
+
 # -- Web listing
 class WebListing(models.Model):
     inventory_item = models.ForeignKey(
@@ -135,3 +139,39 @@ class WebListing(models.Model):
 
     def __str__(self):
         return f"{self.inventory_item.title} listed by {self.listed_by} (£{self.final_price})"
+
+
+# BUYING MARGINS
+class MarginCategory(models.Model):
+    name = models.CharField(max_length=100, unique=True)  # e.g., "Smartphones", "DIY/Drills"
+    base_margin = models.FloatField()  # 0.30 for 30%
+    description = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    def __str__(self):
+        return f"{self.name} ({self.base_margin*100:.1f}%)"
+
+class MarginRule(models.Model):
+    RULE_TYPES = [
+        ('manufacturer', 'Manufacturer'),
+        ('model', 'Model'),
+        ('condition', 'Condition'),
+        ('demand', 'Demand'),
+        ('feature', 'Feature'),
+    ]
+
+    category = models.ForeignKey(Category, on_delete=models.CASCADE, related_name='rules')
+    rule_type = models.CharField(max_length=20, choices=RULE_TYPES)
+    match_value = models.CharField(max_length=100)
+    adjustment = models.FloatField()
+    description = models.CharField(max_length=200, blank=True)
+    order = models.IntegerField(default=0)
+    is_active = models.BooleanField(default=True)
+
+    class Meta:
+        ordering = ['category', 'order', 'rule_type']
+
+    def __str__(self):
+        sign = '+' if self.adjustment >= 0 else ''
+        return f"{self.category.name} - {self.rule_type}: {self.match_value} ({sign}{self.adjustment * 100:.1f}%)"

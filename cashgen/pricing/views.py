@@ -1,12 +1,12 @@
 from django.shortcuts import render
 from django.http import JsonResponse
-from django.shortcuts import get_object_or_404
+from django.shortcuts import get_object_or_404, redirect
 from django.db.models import Q, Prefetch
 from django.utils import timezone
 
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST, require_GET
-from pricing.models import InventoryItem, MarketItem, CompetitorListing, PriceAnalysis
+from pricing.models import InventoryItem, MarketItem, CompetitorListing, PriceAnalysis, Category
 from datetime import datetime
 
 import google.generativeai as genai
@@ -656,6 +656,27 @@ def individual_item_analyser_view(request):
     # GET (render page)
     return render(request, "individual_item_analyser.html", {"prefilled_data": prefilled_data})
 
+from .forms import CategoryForm
+
+def category_list(request):
+    categories = Category.objects.all()
+    return render(request, "categories.html", {"categories": categories})
+
+def add_category(request):
+    if request.method == "POST":
+        form = CategoryForm(request.POST)
+        if form.is_valid():
+            form.save()
+            return redirect("category_list")
+    else:
+        form = CategoryForm()
+    return render(request, "add_category.html", {"form": form})
+
+def manage_category(request, pk):
+    category = get_object_or_404(Category, pk=pk)
+    # Here you could list/edit rules later
+    return render(request, "manage_category.html", {"category": category})
+
 
 def item_buying_analyser_view(request):
     # Handle prefilled data from URL parameters
@@ -805,3 +826,6 @@ def buying_range_analysis(request):
     except Exception as e:
         import traceback; traceback.print_exc()
         return JsonResponse({"success": False, "error": str(e)}, status=500)
+
+
+

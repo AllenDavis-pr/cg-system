@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import MarketItem, CompetitorListing, Category, InventoryItem, PriceAnalysis, PawnShopAgreement
+from .models import MarketItem, CompetitorListing, Category, InventoryItem, PriceAnalysis, PawnShopAgreement, MarginRule, Category
 
 # -------------------------------
 # Scraped Market Data Admin
@@ -29,13 +29,6 @@ class MarketItemAdmin(admin.ModelAdmin):
 # -------------------------------
 # Shop Inventory Admin
 # -------------------------------
-
-@admin.register(Category)
-class CategoryAdmin(admin.ModelAdmin):
-    list_display = ("name",)
-    search_fields = ("name",)
-
-
 
 
 class InventoryItemInline(admin.TabularInline):
@@ -81,3 +74,18 @@ class InventoryItemAdmin(admin.ModelAdmin):
     list_filter = ("status", "category")
     search_fields = ("title", "serial_number")
     inlines = [PriceAnalysisInline]
+
+
+@admin.register(Category)
+class CategoryAdmin(admin.ModelAdmin):
+    list_display = ("id", "name", "base_margin", "description")
+    search_fields = ("name",)
+    ordering = ("name",)
+
+@admin.register(MarginRule)
+class MarginRuleAdmin(admin.ModelAdmin):
+    list_display = ("id", "category", "rule_type", "match_value", "adjustment", "is_active")
+    list_filter = ("rule_type", "is_active", "category")
+    search_fields = ("match_value", "description")
+    ordering = ("category", "order")
+

@@ -1,6 +1,12 @@
 from django import forms
+from .models import Category
 
-class SimpleItemForm(forms.Form):
-    item_name = forms.CharField(max_length=100)
-    storage = forms.CharField(max_length=100)
-    description = forms.CharField(widget=forms.Textarea, required=False)
+class CategoryForm(forms.ModelForm):
+    class Meta:
+        model = Category
+        fields = ["name", "base_margin", "description"]
+        widgets = {
+            "name": forms.TextInput(attrs={"placeholder": "Category name"}),
+            "base_margin": forms.NumberInput(attrs={"step": "0.01", "placeholder": "0.30"}),
+            "description": forms.Textarea(attrs={"placeholder": "Optional description", "rows": 2}),
+        }
