@@ -887,6 +887,7 @@ def detect_irrelevant_competitors(request):
             "- Relevant means: it is the same product of the product searched.\n"
             "- Irrelevant means: wrong model, accessories, games, unrelated items, a variation (such as a Pro vs a Pro Max), or a different product condition (brand new vs used for several years).\n"
             "- Do not include any reasoning, only the indices.\n"
+            "- Be lenient, do NOT determine the relevant listings as irrelevant.\n"
             "- IMPORTANT: Ignore the description for judging relevance unless it contains clear model or variant information. Focus primarily on product title matching."
             "- Respond ONLY with an array of integers, e.g., [0, 2, 5].\n"
             "- DO NOT include any reasoning, text, or extra characters.\n"

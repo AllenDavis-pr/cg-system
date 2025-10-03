@@ -180,7 +180,6 @@ async def generic_scraper(
     Returns (prices, titles, store_names, urls, summary).
     """
     page = await browser_context.new_page()
-
     await setup_page_optimization(page)
 
     try:
@@ -190,120 +189,78 @@ async def generic_scraper(
     except Exception as e:
         print(f"Warning: prices not found for {competitor} within timeout: {e}")
 
-    # --- MUCH FASTER: grab all texts in one call instead of per element ---
-    titles = await page.eval_on_selector_all(
-        title_class,
-        "els => els.map(e => e.innerText.trim())"
-    )
+    prices, titles, store_names, urls = [], [], [], []
 
-    prices_text = await page.eval_on_selector_all(
-        price_class,
-        "els => els.map(e => e.innerText.trim())"
-    )
-    prices = [parse_price(p) for p in prices_text if parse_price(p) is not None]
+    # --- Special case: Cash Converters needs per-card scraping ---
+    if competitor == "CashConverters":
+        product_cards = await page.query_selector_all(".product-item-wrapper")
+        print(f"Found {len(product_cards)} product cards for Cash Converters")
 
-    # We still need element handles for URLs and store names
-    title_elements = await page.query_selector_all(title_class)
-
-    # --- Extract store names as before ---
-    store_names = []
-    if shop_class:
-        try:
-            await page.wait_for_selector(shop_class, timeout=2500)
-        except:
-            pass
-
-        for t_elem in title_elements:
+        for card in product_cards:
             try:
-                shop_elem = await t_elem.query_selector(shop_class)
-                if shop_elem:
-                    store_text = (await shop_elem.inner_text()).strip() or None
-                else:
-                    store_text = await t_elem.evaluate("""
-                        (el, sel) => {
-                            let q = el.querySelector(sel);
-                            if (q && q.innerText.trim()) return q.innerText.trim();
-                            const containers = [
-                                '.snize-overhidden', '.snize-view', '.product-item',
-                                '.product-card', '.card', '.s-item__wrapper', '.su-card-container',
-                                'article', '.product'
-                            ];
-                            for (const c of containers) {
-                                const anc = el.closest(c);
-                                if (anc) {
-                                    q = anc.querySelector(sel);
-                                    if (q && q.innerText.trim()) return q.innerText.trim();
-                                }
-                            }
-                            let parent = el.parentElement;
-                            while (parent) {
-                                q = parent.querySelector(sel);
-                                if (q && q.innerText.trim()) return q.innerText.trim();
-                                parent = parent.parentElement;
-                            }
-                            return null;
-                        }
-                    """, shop_class)
+                # Title
+                title_node = await card.query_selector(title_class)
+                title = (await title_node.inner_text()).strip() if title_node else None
 
-                if store_text:
-                    store_text = store_text.replace('\n', ' ').strip()
-            except Exception:
-                store_text = None
+                # Price
+                price_node = await card.query_selector(price_class)
+                price_text = (await price_node.inner_text()).strip() if price_node else None
+                price = parse_price(price_text) if price_text else None
 
-            store_names.append(store_text)
+                # Store / location
+                store_node = await card.query_selector(shop_class) if shop_class else None
+                store = (await store_node.inner_text()).strip() if store_node else None
 
-        while len(store_names) < len(titles):
-            store_names.append(None)
+                # URL
+                url_node = await card.query_selector("a")
+                href = await url_node.get_attribute("href") if url_node else None
+                if href and href.startswith("/"):
+                    href = SCRAPER_CONFIGS[competitor]["base_url"].rstrip("/") + href
+
+                # Append if valid
+                if title and price:
+                    titles.append(title)
+                    prices.append(price)
+                    store_names.append(store)
+                    urls.append(href)
+
+            except Exception as e:
+                print(f"⚠️ Error parsing CC card: {e}")
+                continue
+
     else:
-        store_names = [None] * len(titles)
+        # --- Default generic scraping ---
+        titles = await page.eval_on_selector_all(
+            title_class,
+            "els => els.map(e => e.innerText.trim())"
+        )
 
+        prices_text = await page.eval_on_selector_all(
+            price_class,
+            "els => els.map(e => e.innerText.trim())"
+        )
+        prices = [parse_price(p) for p in prices_text if parse_price(p) is not None]
+        store_names = [None] * len(titles)
+        urls = [None] * len(titles)
+
+    # --- Filtering ---
     if filter_listings:
         filtered_prices, filtered_titles, filtered_stores = [], [], []
         for price, title, store in zip(prices, titles, store_names):
             title_lower = title.lower()
-            if model.lower() in title_lower and storage.lower() in title_lower:
+            if model.lower() in title_lower:
                 if not exclude or not any(term.lower() in title_lower for term in exclude):
                     filtered_prices.append(price)
                     filtered_titles.append(title)
                     filtered_stores.append(store)
         prices, titles, store_names = filtered_prices, filtered_titles, filtered_stores
 
+    # --- Summary ---
     summary = summarise_prices(prices) if summarise_prices else {
         "Low": min(prices) if prices else None,
         "Mid": statistics.median(prices) if prices else None,
         "High": max(prices) if prices else None,
     }
-
-    # --- Build URLs ---
-    url_selector = SCRAPER_CONFIGS[competitor].get("url_selector")
-    base_url = SCRAPER_CONFIGS[competitor].get("base_url", "")
-    urls = []
-
-    if url_selector:
-        for t_elem in title_elements:
-            href = await t_elem.get_attribute('href')
-            if not href:
-                a = await t_elem.query_selector('a')
-                href = await a.get_attribute('href') if a else None
-            if not href:
-                try:
-                    href = await t_elem.evaluate(
-                        '(el, sel) => { const q = el.querySelector(sel); if (q) return q.getAttribute("href"); const c = el.closest(sel); return c ? c.getAttribute("href") : null }',
-                        url_selector
-                    )
-                except Exception:
-                    href = None
-
-            if href and href.startswith("/") and base_url:
-                href = base_url.rstrip('/') + href
-            elif href and not href.startswith("http") and base_url:
-                href = base_url.rstrip('/') + '/' + href
-            urls.append(href)
-
-        while len(urls) < len(titles):
-            urls.append(None)
-    else:
-        urls = [None] * len(titles)
 
     try:
         await page.close()
@@ -553,6 +510,7 @@ def save_prices(competitors, search_string, exclude=None, filter_listings=None, 
             CompetitorListing.objects.update_or_create(
                 market_item=item,
                 competitor=competitor,
+                url=url_item,
                 title=title,
                 defaults={
                     "price": price,
