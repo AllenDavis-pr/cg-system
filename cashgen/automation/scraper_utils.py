@@ -17,7 +17,7 @@ SCRAPER_CONFIGS = {
         "base_url": "https://www.cashconverters.co.uk",
         "url": "https://www.cashconverters.co.uk/search-results?Sort=default&page=1"
                "&f%5Bcategory%5D%5B0%5D=all&f%5Blocations%5D%5B0%5D=all"
-               "&query={model}%20{storage}",
+               "&query={query}",
         "price_class": ".product-item__price",
         "url_selector": ".product-item__title, .product-item__image a",
         "title_class": ".product-item__title__description",
@@ -28,8 +28,8 @@ SCRAPER_CONFIGS = {
     },
 
     "CashGenerator": {
-        "base_url": "https://cashgenerator.co.uk",  # <-- add this
-        "url": "https://cashgenerator.co.uk/pages/search-results-page?q={model}%20{storage}",
+        "base_url": "https://cashgenerator.co.uk",
+        "url": "https://cashgenerator.co.uk/pages/search-results-page?q={query}",
         "url_selector": ".snize-view-link",
         "price_class": ".snize-price.money",
         "title_class": ".snize-title",
@@ -41,7 +41,7 @@ SCRAPER_CONFIGS = {
 
     "CEX": {
         "base_url": "https://uk.webuy.com",
-        "url": "https://uk.webuy.com/search?stext={model}+{storage}",
+        "url": "https://uk.webuy.com/search?stext={query}",
         "price_class": ".product-main-price",
         "title_class": ".card-title",
         "url_selector": ".card-title a",
@@ -53,10 +53,10 @@ SCRAPER_CONFIGS = {
 
     "eBay": {
         "base_url": "https://ebay.co.uk",
-        "url": "https://www.ebay.co.uk/sch/i.html?_nkw={model}+{storage}&_sacat=0&_from=R40&_trksid=p4432023.m570.l1313",
+        "url": "https://www.ebay.co.uk/sch/i.html?_nkw={query}&_sacat=0&_from=R40&_trksid=p4432023.m570.l1313",
         "price_class": ".s-card__price, .su-styled-text.primary.bold.large-1.s-card__price",
         "title_class": ".s-card__title",
-        "url_selector": ".su-card-container__content > a",  # explicit first product link
+        "url_selector": ".su-card-container__content > a",
     }
 }
 
@@ -81,7 +81,6 @@ async def generic_scraper(
         url: str,
         competitor: str,
         model: str,
-        storage: str,
         price_class: str,
         title_class: str,
         shop_class: str = None,
@@ -324,7 +323,7 @@ async def _scrape_competitor(browser_context, competitor, search_string, exclude
 
     # URL encoding for spaces
     query_str = search_string.replace(" ", "+" if competitor in ["CEX", "eBay"] else "%20")
-    url = config["url"].format(model=query_str, storage="")  # storage ignored for now
+    url = config["url"].format(query=query_str, storage="")  # storage ignored for now
 
     if competitor == "eBay":
         prices, titles, urls, summary = await ebay_scraper(
@@ -341,7 +340,6 @@ async def _scrape_competitor(browser_context, competitor, search_string, exclude
             url=url,
             competitor=competitor,
             model=search_string,
-            storage="",
             price_class=config["price_class"],
             title_class=config["title_class"],
             shop_class=config.get("shop_class"),
