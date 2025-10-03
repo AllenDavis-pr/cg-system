@@ -53,7 +53,10 @@ SCRAPER_CONFIGS = {
 
     "eBay": {
         "base_url": "https://ebay.co.uk",
-        "url": "https://www.ebay.co.uk/sch/i.html?_nkw={query}&_sacat=0&_from=R40&_trksid=p4432023.m570.l1313",
+        "url": ("https://www.ebay.co.uk/sch/i.html?"
+            "_nkw={query}&_sacat=0&_from=R40"
+            "&LH_ItemCondition=3000&LH_PrefLoc=1"
+            "&LH_Sold=1&LH_Complete=1"),
         "price_class": ".s-card__price, .su-styled-text.primary.bold.large-1.s-card__price",
         "title_class": ".s-card__title",
         "url_selector": ".su-card-container__content > a",
