@@ -1,6 +1,11 @@
 {% extends "base.html" %}
 {% block title %}{% if is_edit %}Edit Global Rule{% else %}Add Global Rule{% endif %}{% endblock %}
 
+{% block back_button %}
+  <a href="{% url 'category_list' %}" class="btn">Back to Rules</a>
+{% endblock %}
+
+
 {% block content %}
 <h2>{{ is_edit|yesno:"Edit Global Rule,Add Global Rule" }}</h2>
 

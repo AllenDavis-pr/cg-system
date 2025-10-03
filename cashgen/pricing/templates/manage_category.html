@@ -2,16 +2,17 @@
 
 {% block title %}Manage {{ category.name }}{% endblock %}
 
+{% block back_button %}
+  <a href="{% url 'category_list' %}" class="btn">Back to Rules</a>
+{% endblock %}
+
 {% block content %}
 <div class="content">
     <div style="display:flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
         <h2>{{ category.name }} (Base Margin: {{ category.base_margin }})</h2>
         <div>
             <a href="{% url 'edit_category' category.pk %}" class="btn">Edit</a>
-            <form action="{% url 'delete_category' category.pk %}" method="post" style="display:inline;">
-                {% csrf_token %}
-                <button type="submit" class="btn">X</button>
-            </form>
+            <a href="{% url 'delete_category' category.pk %}" class="btn btn-delete">Delete</a>
         </div>
     </div>
 
