@@ -639,6 +639,8 @@ def price_analysis_detail(request, analysis_id):
         "serial_number": analysis.item.serial_number,     # <-- add this
     })
 
+
+# ----------------------- HOME PAGE VIEWS -------------------------------------
 def individual_item_analysis_view(request):
     return render(request, "analysis/individual_item_analysis.html")
 
@@ -658,6 +660,38 @@ def individual_item_analyser_view(request):
     return render(request, "analysis/individual_item_analyser.html", {"prefilled_data": prefilled_data})
 
 from .forms import CategoryForm, MarginRuleForm, GlobalMarginRuleForm
+
+
+def item_buying_analyser_view(request):
+    # Handle prefilled data from URL parameters
+    prefilled_data = get_prefilled_data(request)
+
+    if request.method == "POST" and request.headers.get("Content-Type") == "application/json":
+        return handle_item_analysis_request(request)
+
+    # GET (render page)
+    return render(request, "analysis/item_buying_analyser.html", {"prefilled_data": prefilled_data})
+
+def buying_analysis_negotiation(request):
+    context = {
+        "year": timezone.now().year,
+    }
+    return render(request, "buying_analysis_negotiation.html", context)
+
+# Note: This is technically not in the home page right now
+def inventory_free_stock_view(request):
+    inventory_items = (
+        InventoryItem.objects
+        .filter(status="free_stock")
+        .select_related("agreement", "market_item")
+        .prefetch_related(
+            Prefetch("market_item__listings")
+        )
+    )
+    return render(request, "deprecated/inventory_free_stock.html", {"inventory_items": inventory_items})
+
+
+# --------------------- END HOME PAGE VIEWS -------------------------------------
 
 def category_list(request):
     categories = Category.objects.all()
@@ -816,29 +850,7 @@ def delete_global_rule(request, pk):
     return render(request, "rules/delete_global_rule_confirm.html", {"rule": rule})
 
 
-def item_buying_analyser_view(request):
-    # Handle prefilled data from URL parameters
-    prefilled_data = get_prefilled_data(request)
-    
-    if request.method == "POST" and request.headers.get("Content-Type") == "application/json":
-        return handle_item_analysis_request(request)
-    
-    # GET (render page)
-    return render(request, "analysis/item_buying_analyser.html", {"prefilled_data": prefilled_data}
 
-                  )
-
-
-def inventory_free_stock_view(request):
-    inventory_items = (
-        InventoryItem.objects
-        .filter(status="free_stock")
-        .select_related("agreement", "market_item")
-        .prefetch_related(
-            Prefetch("market_item__listings")
-        )
-    )
-    return render(request, "deprecated/inventory_free_stock.html", {"inventory_items": inventory_items})
 
 
 @csrf_exempt

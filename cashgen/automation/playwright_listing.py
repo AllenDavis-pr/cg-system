@@ -107,10 +107,10 @@ async def main():
             }
             """)
 
-            # await asyncio.sleep(10)
+            await asyncio.sleep(3)
 
             # Click the button
-            # await page.click("button:has-text('Save Product')", force=True)
+            await page.click("button:has-text('Save Product')", force=True)
 
             print("[OK] Clicked Save button with force click (fallback).", flush=True)
 
