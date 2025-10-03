@@ -452,7 +452,7 @@ def update_marketitem_keywords(request):
 
 
 def bulk_analysis(request):
-    return render(request, 'bulk_analysis.html')
+    return render(request, 'analysis/bulk_analysis.html')
 
 
 @csrf_exempt
@@ -640,7 +640,7 @@ def price_analysis_detail(request, analysis_id):
     })
 
 def individual_item_analysis_view(request):
-    return render(request, "individual_item_analysis.html")
+    return render(request, "analysis/individual_item_analysis.html")
 
 
 def home_view(request):
@@ -655,14 +655,14 @@ def individual_item_analyser_view(request):
         return handle_item_analysis_request(request)
     
     # GET (render page)
-    return render(request, "individual_item_analyser.html", {"prefilled_data": prefilled_data})
+    return render(request, "analysis/individual_item_analyser.html", {"prefilled_data": prefilled_data})
 
 from .forms import CategoryForm, MarginRuleForm, GlobalMarginRuleForm
 
 def category_list(request):
     categories = Category.objects.all()
     global_rules = GlobalMarginRule.objects.all()
-    return render(request, "categories.html", {
+    return render(request, "rules/categories.html", {
         "categories": categories,
         "global_rules": global_rules,
     })
@@ -672,7 +672,7 @@ def category_detail(request, pk):
     category = get_object_or_404(Category, pk=pk)
     rules = category.rules.all()  # MarginRules related to this category
 
-    return render(request, "category_detail.html", {
+    return render(request, "rules/category_detail.html", {
         "category": category,
         "rules": rules,
     })
@@ -686,7 +686,7 @@ def add_category(request):
             return redirect("category_list")
     else:
         form = CategoryForm()
-    return render(request, "add_category.html", {"form": form})
+    return render(request, "rules/add_category.html", {"form": form})
 
 def edit_category(request, pk):
     category = get_object_or_404(Category, pk=pk)
@@ -699,7 +699,7 @@ def edit_category(request, pk):
     else:
         form = CategoryForm(instance=category)
 
-    return render(request, "add_category.html", {
+    return render(request, "rules/add_category.html", {
         "form": form,
         "category": category,
         "is_edit": True,  # optional flag for template
@@ -708,7 +708,7 @@ def edit_category(request, pk):
 def manage_category(request, pk):
     category = get_object_or_404(Category, pk=pk)
     # Here you could list/edit rules later
-    return render(request, "manage_category.html", {"category": category})
+    return render(request, "rules/manage_category.html", {"category": category})
 
 
 def delete_category(request, pk):
@@ -719,7 +719,7 @@ def delete_category(request, pk):
         return redirect("category_list")  # Redirect to the category list page
 
     # Optional: show a confirmation page
-    return render(request, "delete_category_confirm.html", {"category": category})
+    return render(request, "rules/delete_category_confirm.html", {"category": category})
 
 
 def add_rule(request, category_pk):
@@ -735,7 +735,7 @@ def add_rule(request, category_pk):
     else:
         form = MarginRuleForm()
 
-    return render(request, "add_edit_rule.html", {
+    return render(request, "rules/add_edit_rule.html", {
         "form": form,
         "category": category,
         "is_edit": False,
@@ -753,7 +753,7 @@ def edit_rule(request, pk):
     else:
         form = MarginRuleForm(instance=rule)
 
-    return render(request, "add_edit_rule.html", {
+    return render(request, "rules/add_edit_rule.html", {
         "form": form,
         "category": category,
         "is_edit": True,
@@ -769,7 +769,7 @@ def delete_rule(request, pk):
         return redirect("category_detail", pk=category.pk)
 
     # Optional confirmation page
-    return render(request, "delete_rule_confirm.html", {"rule": rule, "category": category})
+    return render(request, "rules/delete_rule_confirm.html", {"rule": rule, "category": category})
 
 
 def add_global_rule(request):
@@ -783,7 +783,7 @@ def add_global_rule(request):
     else:
         form = GlobalMarginRuleForm()
 
-    return render(request, "add_edit_global_rule.html", {
+    return render(request, "rules/add_edit_global_rule.html", {
         "form": form,
         "is_edit": False,
     })
@@ -800,7 +800,7 @@ def edit_global_rule(request, pk):
     else:
         form = GlobalMarginRuleForm(instance=rule)
 
-    return render(request, "add_edit_global_rule.html", {
+    return render(request, "rules/add_edit_global_rule.html", {
         "form": form,
         "is_edit": True,
     })
@@ -813,7 +813,7 @@ def delete_global_rule(request, pk):
         rule.delete()
         return redirect("category_list")
 
-    return render(request, "delete_global_rule_confirm.html", {"rule": rule})
+    return render(request, "rules/delete_global_rule_confirm.html", {"rule": rule})
 
 
 def item_buying_analyser_view(request):
@@ -824,7 +824,7 @@ def item_buying_analyser_view(request):
         return handle_item_analysis_request(request)
     
     # GET (render page)
-    return render(request, "item_buying_analyser.html", {"prefilled_data": prefilled_data}
+    return render(request, "analysis/item_buying_analyser.html", {"prefilled_data": prefilled_data}
 
                   )
 
@@ -838,7 +838,7 @@ def inventory_free_stock_view(request):
             Prefetch("market_item__listings")
         )
     )
-    return render(request, "inventory_free_stock.html", {"inventory_items": inventory_items})
+    return render(request, "deprecated/inventory_free_stock.html", {"inventory_items": inventory_items})
 
 
 @csrf_exempt
