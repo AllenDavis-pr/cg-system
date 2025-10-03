@@ -80,6 +80,89 @@ async def setup_page_optimization(page):
     })
 
 
+def parse_query_string(query_string):
+    """
+    Parse a specially formatted query string like:
+    "Model: iPhone 15 Pro Max, Storage: 256GB, Color: Black"
+
+    Returns:
+        model (str): The model string
+        filters (dict): Dictionary of filters {key: value}
+        search_string (str): Combined search string for the query
+    """
+    # Check if this is a structured query (contains "Model:")
+    if "Model:" not in query_string:
+        # Not structured, treat as regular search string
+        return query_string, {}, query_string
+
+    # Parse structured format
+    parts = [p.strip() for p in query_string.split(',')]
+
+    model = None
+    filters = {}
+
+    for part in parts:
+        if ':' in part:
+            key, value = part.split(':', 1)
+            key = key.strip()
+            value = value.strip()
+
+            if key.lower() == 'model':
+                model = value
+            else:
+                filters[key] = value
+
+    # Build search string from model + filter values
+    if model:
+        search_parts = [model]
+        search_parts.extend(filters.values())
+        search_string = ', '.join(search_parts)
+    else:
+        search_string = query_string
+
+    return model or query_string, filters, search_string
+
+
+async def ebay_list_filters(page):
+    """
+    Prints all available eBay filter groups and options from the left-hand rail.
+    """
+    try:
+        # wait for the filter rail
+        await page.wait_for_selector('div.srp-rail__left ul', timeout=8000)
+    except Exception:
+        print("⚠️ No filter sidebar found")
+        return
+
+    # grab all main filter groups
+    groups = await page.query_selector_all('li.x-refine__main__list')
+
+    print(f"Found {len(groups)} filter groups")
+
+    for idx, group in enumerate(groups, start=1):
+        try:
+            # filter title
+            title = await group.eval_on_selector(
+                'h3.x-refine__item__title',
+                "el => el.innerText.trim()"
+            )
+        except:
+            title = "(untitled group)"
+
+        print(f"\n[{idx}] {title}")
+
+        # now get each option under this group
+        options = await group.query_selector_all('div.x-refine__group li.srp-refine__category__item')
+
+        for opt in options:
+            try:
+                text = await opt.eval_on_selector('span, a', "el => el.innerText.trim()")
+                href = await opt.eval_on_selector('a', "el => el.href") or None
+                print(f"   - {text}   ({'link' if href else 'selected'}) {href or ''}")
+            except Exception as e:
+                print(f"   - error reading option: {e}")
+
+
 async def generic_scraper(
         url: str,
         competitor: str,
@@ -231,75 +314,147 @@ async def generic_scraper(
 
 async def ebay_scraper(
         url: str,
-        model: str,
+        search_string: str,
         exclude=None,
         filter_listings=None,
         summarise_prices=None,
         browser_context=None
 ):
     """
-    Specialized eBay scraper that matches prices to titles correctly (single loop per card).
-    Now optimized with eval_on_selector_all to reduce async roundtrips.
+    Robust eBay scraper targeting the modern SRP layout (li.s-card under #srp-river-results > ul).
+    Hard-coded selectors are used, but function tolerates missing elements in each card.
+    Returns: prices, titles, urls, summary
     """
     page = await browser_context.new_page()
-
-    # Apply optimizations
     await setup_page_optimization(page)
 
+    # Parse structured query (keeps your existing behavior)
+    model, filters, _ = parse_query_string(search_string)
+
+    # Navigate
+    await page.goto(url, wait_until='domcontentloaded')
+
+    await ebay_list_filters(page)
+
+    # Wait for the SRP list or fallback
     try:
-        await page.goto(url, wait_until='domcontentloaded')
-        try:
-            await page.wait_for_selector('.s-item__wrapper, .su-card-container, .s-item', timeout=10000)
-        except:
-            print("Warning: No eBay product wrapper found, proceeding anyway")
-    except Exception as e:
-        print(f"Warning: eBay content loading issue: {e}")
+        await page.wait_for_selector('#srp-river-results > ul', timeout=10000)
+    except Exception:
+        # fallback: continue even if the main container isn't found quickly
+        print("Warning: '#srp-river-results > ul' not found within timeout, trying fallbacks")
 
-    print("Reached ", url)
+    # Try main selector first, then fallbacks
+    li_elements = []
+    try:
+        li_elements = await page.query_selector_all('#srp-river-results > ul > li')
+    except Exception:
+        li_elements = []
 
-    # --- Grab card containers once ---
-    card_containers = await page.query_selector_all('.s-item__wrapper, .su-card-container, .s-item')
+    if not li_elements:
+        # fallback selectors that commonly appear on SRP pages
+        li_elements = await page.query_selector_all('li.s-card, li.s-item, #srp-river-results ul li')
+
+    print(f"Found {len(li_elements)} candidate <li> items")
 
     prices, titles, urls = [], [], []
 
-    for card in card_containers:
+    for card in li_elements:
         try:
-            # --- Titles (faster eval inside card) ---
-            title = await card.eval_on_selector(
-                '.s-item__title, .s-card__title, .s-item__title-text',
-                "el => el.innerText.trim()",
+            # Evaluate a single JS snippet in the context of the card element.
+            # This avoids individual eval_on_selector calls that raise when absent.
+            data = await card.evaluate(
+                """(el) => {
+                    const pickNode = (sels) => {
+                        for (const s of sels) {
+                            const n = el.querySelector(s);
+                            if (n) return n;
+                        }
+                        return null;
+                    };
+
+                    // URL: prefer the content/title anchor, fall back to image anchor or first anchor
+                    const a = pickNode([
+                        '.su-card-container__content a.su-link',
+                        '.su-card-container__content a',
+                        'a.su-link',
+                        'a.image-treatment',
+                        'a.s-card__link',
+                        'a'
+                    ]);
+                    const href = a && a.href ? a.href : null;
+
+                    // Title: various places the title might live
+                    const titleNode = el.querySelector('.s-card__title .su-styled-text.primary')
+                        || el.querySelector('.s-card__title')
+                        || el.querySelector('[role=\"heading\"]')
+                        || el.querySelector('.s-item__title')
+                        || el.querySelector('.s-card__title span');
+                    let title = titleNode ? titleNode.innerText.trim() : null;
+                    if (title) {
+                        // remove "New listing" noise
+                        title = title.replace(/^New listing\\s*/i, '').trim();
+                    }
+
+                    // Price: common price selectors
+                    const priceNode = pickNode([
+                        '.s-card__price',
+                        '.s-item__price',
+                        '.notranslate',
+                        '.s-card__price .su-styled-text.positive',
+                        '.s-card__price span'
+                    ]);
+                    const price_text = priceNode ? priceNode.innerText.trim() : null;
+
+                    // Seller (optional)
+                    const sellerNode = pickNode([
+                        '.su-card-container__attributes__secondary .su-styled-text.primary',
+                        '.s-item__seller-info',
+                        '.s-item__seller'
+                    ]);
+                    const seller = sellerNode ? sellerNode.innerText.trim() : null;
+
+                    // Sold / caption (optional)
+                    const soldNode = el.querySelector('.s-card__caption span') || el.querySelector('.s-item__sold-date');
+                    const sold = soldNode ? soldNode.innerText.trim() : null;
+
+                    return { href, title, price_text, seller, sold };
+                }"""
             )
-            if not title or title.lower() in ['shop on ebay', '', 'new listing']:
+
+            # data is a dict-like object
+            title = data.get('title') if isinstance(data, dict) else None
+            price_text = data.get('price_text') if isinstance(data, dict) else None
+            href = data.get('href') if isinstance(data, dict) else None
+
+            # basic sanity checks
+            if not title:
+                # skip listings with no usable title
+                continue
+            if not price_text:
+                # skip if no price text found
                 continue
 
-            # --- Prices (grab all in one go) ---
-            card_prices_text = await card.eval_on_selector_all(
-                '.s-item__price, .s-card__price, .notranslate',
-                "els => els.map(e => e.innerText.trim())",
-            )
-            card_prices = [parse_price(pt) for pt in card_prices_text if parse_price(pt) is not None]
-            if not card_prices:
+            main_price = parse_price(price_text) if price_text else None
+            if main_price is None:
+                # cannot parse price
                 continue
-
-            main_price = card_prices[0]
-
-            # --- URL (first link in card) ---
-            href = await card.eval_on_selector("a", "el => el.getAttribute('href')") if await card.query_selector("a") else None
 
             prices.append(main_price)
             titles.append(title)
             urls.append(href)
 
         except Exception as e:
+            # log and continue with next card
             print(f"Error processing eBay card: {e}")
             continue
 
+    # close page
     try:
         await page.close()
     except Exception:
         pass
 
-    # Optional filtering
+    # Optional filtering by model/exclude (keeps your existing behavior)
     if filter_listings:
         filtered_prices, filtered_titles, filtered_urls = [], [], []
         model_lower = model.lower()
@@ -312,26 +467,30 @@ async def ebay_scraper(
                     filtered_urls.append(u)
         prices, titles, urls = filtered_prices, filtered_titles, filtered_urls
 
+    # Summary
     summary = summarise_prices(prices) if summarise_prices else {
         "Low": min(prices) if prices else None,
         "Mid": statistics.median(prices) if prices else None,
         "High": max(prices) if prices else None,
     }
 
-    return prices, titles, urls, summary
+    print(f"Scraped {len(prices)} listings from eBay")
 
+    return prices, titles, urls, summary
 
 async def _scrape_competitor(browser_context, competitor, search_string, exclude, filter_listings, summarise_prices):
     config = SCRAPER_CONFIGS[competitor]
+    # Parse the query string to extract model and filters
+    model, filters, combined_search_string = parse_query_string(search_string)
 
     # URL encoding for spaces
-    query_str = search_string.replace(" ", "+" if competitor in ["CEX", "eBay"] else "%20")
+    query_str = combined_search_string.replace(" ", "+" if competitor in ["CEX", "eBay"] else "%20")
     url = config["url"].format(query=query_str, storage="")  # storage ignored for now
 
     if competitor == "eBay":
         prices, titles, urls, summary = await ebay_scraper(
             url=url,
-            model=search_string,
+            search_string=search_string,
             exclude=exclude,
             filter_listings=filter_listings,
             summarise_prices=summarise_prices,
@@ -403,7 +562,6 @@ def save_prices(competitors, search_string, exclude=None, filter_listings=None, 
             )
 
     return summaries
-
 
 
 def parse_price(text):
